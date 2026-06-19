@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage } from "electron";
+import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { StateStore, type LightEvent, type AppState } from "./state";
@@ -6,6 +6,7 @@ import { DEFAULT_PORT, startServer } from "./server";
 import { MemoStore, type Memo } from "./memos";
 import { SystemStore, type SystemState } from "./system";
 import { WinBridge, type MediaAction } from "./winbridge";
+import { getHooksStatus, installHooks, type InstallTarget } from "./hooks-setup";
 
 interface HotZone {
   x: number;
@@ -175,6 +176,21 @@ function createTray(): void {
         },
       },
       { type: "separator" },
+      {
+        label: "一键接入 Claude / Codex",
+        click: () => {
+          const result = installHooks("both");
+          dialog.showMessageBox({
+            type: result.ok ? "info" : "warning",
+            title: "Light · 接入",
+            message: result.ok ? "接入完成" : "接入未全部成功",
+            detail: result.message,
+            buttons: ["好的"],
+            noLink: true,
+          });
+        },
+      },
+      { type: "separator" },
       { label: `HTTP :${DEFAULT_PORT}`, enabled: false },
       { type: "separator" },
       { label: "Quit", click: () => app.quit() },
@@ -222,6 +238,12 @@ function wireIpc(): void {
   });
   ipcMain.on("light:remove-session", (_evt, key: string) => {
     if (typeof key === "string") store.removeSession(key);
+  });
+  ipcMain.handle("light:get-hooks-status", () => getHooksStatus());
+  ipcMain.handle("light:install-hooks", (_evt, agent: InstallTarget) => {
+    const target: InstallTarget =
+      agent === "claude" || agent === "codex" || agent === "both" ? agent : "both";
+    return installHooks(target);
   });
   ipcMain.on("light:quit", () => app.quit());
 

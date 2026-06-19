@@ -20,7 +20,7 @@ npm run dist
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\light.iss
 ```
 
-产物：`release\Light-Setup-1.0.0.exe` —— 这就是发给别人下载的安装包。
+产物：`release\Light-Setup-1.1.0.exe` —— 这就是发给别人下载的安装包。
 
 ## 安装包特性
 

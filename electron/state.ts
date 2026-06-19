@@ -46,6 +46,13 @@ const STALE_WORKING_MS = 4 * 60_000;
 const IDLE_GC_MS = 30 * 60_000; // drop idle sessions after 30 min of no activity
 const RECENT_CAP = 30;
 
+// Codex fires no SessionEnd/close hook, so — unlike Claude Code — we can't drop
+// its pill the instant the window closes. Instead we retire such a session a
+// short while after it goes quiet (done → idle); any new event brings it right
+// back. Without this a finished/closed Codex would linger until the 30-min GC.
+const NO_END_IDLE_MS = 15_000;
+const AGENTS_WITHOUT_SESSION_END = new Set<AgentId>(["codex"]);
+
 const VALID_AGENTS = new Set<AgentId>(["claude-code", "codex", "trae"]);
 const VALID_TYPES = new Set<EventType>([
   "session_start",
@@ -218,22 +225,36 @@ export class StateStore extends EventEmitter {
     const cur = this.sessions.get(key);
     if (!cur) return;
 
+    const noEnd = AGENTS_WITHOUT_SESSION_END.has(cur.agent);
+
     // done/error linger briefly then settle to idle. "working" gets a much
     // longer watchdog so a crashed/disconnected agent doesn't climb forever.
+    // For agents with no close hook, "idle" also gets a (short) timer so we can
+    // retire the pill once it's been quiet — they never tell us they closed.
     let delay = 0;
     if (cur.status === "done") delay = DONE_LINGER_MS;
     else if (cur.status === "error") delay = ERROR_LINGER_MS;
     else if (cur.status === "working") delay = STALE_WORKING_MS;
+    else if (cur.status === "idle" && noEnd) delay = NO_END_IDLE_MS;
     else return;
 
     const timer = setTimeout(() => {
       const c = this.sessions.get(key);
       if (!c) return;
+      // A no-close-signal agent that's gone quiet → the window is probably gone.
+      // Retire the session so a stale pill never lingers; it reappears with a
+      // fresh seq on the next event.
+      if (c.status === "idle" && noEnd) {
+        this.removeSession(key);
+        return;
+      }
       if (c.status === "done" || c.status === "error" || c.status === "working") {
         c.status = "idle";
         c.startedAt = undefined;
         c.currentTool = undefined;
         this.emit("state", this.getState());
+        // Now idle — for no-close-signal agents, arm the retire timer.
+        if (noEnd) this.scheduleAutoReset(key);
       }
     }, delay);
     this.timers.set(key, timer);

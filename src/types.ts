@@ -67,6 +67,29 @@ export interface HotZone {
   h: number;
 }
 
+export type HookAgentKey = "claude" | "codex";
+
+export interface AgentHookStatus {
+  agent: HookAgentKey;
+  configPath: string;
+  configExists: boolean;
+  installed: boolean;
+  needsUpdate: boolean;
+}
+
+export interface HooksStatus {
+  hooksDir: string | null;
+  ready: boolean;
+  claude: AgentHookStatus;
+  codex: AgentHookStatus;
+}
+
+export interface HooksInstallResult {
+  ok: boolean;
+  message: string;
+  status: HooksStatus;
+}
+
 declare global {
   interface Window {
     light: {
@@ -87,6 +110,8 @@ declare global {
       deleteMemo: (id: string) => void;
       clearEvents: () => void;
       removeSession: (key: string) => void;
+      getHooksStatus: () => Promise<HooksStatus>;
+      installHooks: (agent: HookAgentKey | "both") => Promise<HooksInstallResult>;
       mediaControl: (action: MediaAction) => void;
       setHotZones: (zones: HotZone[]) => void;
       quit: () => void;

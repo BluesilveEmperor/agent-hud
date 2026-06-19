@@ -30,8 +30,10 @@ release/
 Thumbs.db
 desktop.ini
 
-# Personal launch copy — not part of the OSS product
+# Personal launch / competition material — not part of the OSS product
 发布文案.md
+参赛展示页.html
+封面.png
 
 # Local notification-debug helpers — not part of the product
 bridge/diag*.ps1

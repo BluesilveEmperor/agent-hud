@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld("light", {
   deleteMemo: (id: string) => ipcRenderer.send("light:delete-memo", id),
   clearEvents: () => ipcRenderer.send("light:clear-events"),
   removeSession: (key: string) => ipcRenderer.send("light:remove-session", key),
+  getHooksStatus: () => ipcRenderer.invoke("light:get-hooks-status"),
+  installHooks: (agent: string) => ipcRenderer.invoke("light:install-hooks", agent),
   mediaControl: (action: string) => ipcRenderer.send("light:media-control", action),
   setHotZones: (zones: HotZone[]) => ipcRenderer.send("light:set-hot-zones", zones),
   quit: () => ipcRenderer.send("light:quit"),

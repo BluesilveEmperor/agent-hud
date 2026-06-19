@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
-import type { SessionState, AgentId, LightEvent, Memo, SystemState } from "../types";
+import type {
+  SessionState,
+  AgentId,
+  LightEvent,
+  Memo,
+  SystemState,
+  HooksStatus,
+  HookAgentKey,
+} from "../types";
 import { MediaFull } from "./MediaCard";
 
 const AGENT_LABEL: Record<AgentId, string> = {
@@ -116,6 +124,10 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
         </div>
       </motion.div>
 
+      <motion.div className="section" variants={ITEM}>
+        <HooksSection />
+      </motion.div>
+
       {system.media && system.media.title && (
         <motion.div className="section" variants={ITEM}>
           <div className="section-head">
@@ -183,6 +195,86 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+const HOOK_AGENTS: { key: HookAgentKey; label: string }[] = [
+  { key: "claude", label: "Claude Code" },
+  { key: "codex", label: "Codex" },
+];
+
+// In-app one-click hook setup. Light can only *receive* events, so each agent
+// has to call our forwarding script from its own config. This merges that in
+// safely (never overwrites the user's other settings).
+function HooksSection() {
+  const [status, setStatus] = useState<HooksStatus | null>(null);
+  const [busy, setBusy] = useState<HookAgentKey | "both" | null>(null);
+  const [note, setNote] = useState<string>("");
+
+  const refresh = () => {
+    window.light?.getHooksStatus().then(setStatus).catch(() => {});
+  };
+  useEffect(refresh, []);
+
+  const install = async (agent: HookAgentKey | "both") => {
+    if (!window.light?.installHooks || busy) return;
+    setBusy(agent);
+    setNote("");
+    try {
+      const res = await window.light.installHooks(agent);
+      setStatus(res.status);
+      setNote(res.message);
+    } catch {
+      setNote("接入失败，请重试");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const both = status?.claude.installed && status?.codex.installed;
+
+  return (
+    <>
+      <div className="section-head">
+        <span>接入 Agent</span>
+        <button
+          className="link-btn"
+          onClick={() => install("both")}
+          disabled={!status?.ready || busy !== null || both}
+        >
+          {both ? "已全部接入" : busy === "both" ? "接入中…" : "一键接入"}
+        </button>
+      </div>
+      <div className="card">
+        {!status ? (
+          <div className="empty">检测中…</div>
+        ) : !status.ready ? (
+          <div className="empty">找不到 hooks 脚本目录</div>
+        ) : (
+          HOOK_AGENTS.map(({ key, label }) => {
+            const st = status[key];
+            const state = st.installed ? "ok" : st.needsUpdate ? "warn" : "off";
+            const stateText =
+              state === "ok" ? "已接入" : state === "warn" ? "需更新路径" : "未接入";
+            return (
+              <div key={key} className="panel-row hook-row">
+                <span className={`hook-dot ${state}`} />
+                <span className="panel-name">{label}</span>
+                <span className="sub hook-state">{stateText}</span>
+                <button
+                  className="hook-btn"
+                  onClick={() => install(key)}
+                  disabled={busy !== null || st.installed}
+                >
+                  {busy === key ? "…" : st.installed ? "✓" : st.needsUpdate ? "更新" : "接入"}
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+      {note && <div className="hook-note">{note}</div>}
+    </>
   );
 }
 

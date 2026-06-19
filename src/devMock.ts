@@ -218,6 +218,46 @@ export function installMockBridge(): void {
     },
     clearEvents: () => {},
     removeSession: () => {},
+    getHooksStatus: async () => ({
+      hooksDir: "/mock/light/hooks",
+      ready: true,
+      claude: {
+        agent: "claude" as const,
+        configPath: "~/.claude/settings.json",
+        configExists: true,
+        installed: true,
+        needsUpdate: false,
+      },
+      codex: {
+        agent: "codex" as const,
+        configPath: "~/.codex/hooks.json",
+        configExists: true,
+        installed: false,
+        needsUpdate: false,
+      },
+    }),
+    installHooks: async (agent) => ({
+      ok: true,
+      message: `已接入 (${agent})，重启后生效（mock）`,
+      status: {
+        hooksDir: "/mock/light/hooks",
+        ready: true,
+        claude: {
+          agent: "claude" as const,
+          configPath: "~/.claude/settings.json",
+          configExists: true,
+          installed: true,
+          needsUpdate: false,
+        },
+        codex: {
+          agent: "codex" as const,
+          configPath: "~/.codex/hooks.json",
+          configExists: true,
+          installed: true,
+          needsUpdate: false,
+        },
+      },
+    }),
     mediaControl: (action: MediaAction) => {
       if (media.media && (action === "playpause" || action === "play" || action === "pause")) {
         media.media = { ...media.media, playing: !media.media.playing };

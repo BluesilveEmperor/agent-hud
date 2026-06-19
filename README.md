@@ -9,6 +9,7 @@
 
 - **状态一目了然**：工作中泛蓝光呼吸、完成变绿打勾、出错变红，还显示当前工具与用时。
 - **多会话 / 多 agent**：Claude Code 与 Codex 同时跑也能分栏显示，互不打架。
+- **一键接入**：app 内一键把 hooks 写进 Claude Code / Codex 配置，无需手写 JSON（安全合并、不覆盖、自动备份）。
 - **顺手的小工具**：桌面备忘录、当前播放的音乐（可上一首 / 下一首 / 暂停）。
 - **磨砂玻璃 UI**：任何壁纸下都清晰；鼠标移上去展开详情面板。
 - **纯本地**：只监听 `127.0.0.1`，不联网、不上传任何数据。
@@ -73,11 +74,16 @@ curl -X POST http://127.0.0.1:51789/event \
 
 ## 接入 Claude Code / Codex
 
-见 [hooks/README.md](hooks/README.md)。
+**最简单的方式（推荐）：** 打开 Light，鼠标移到胶囊上展开面板 → **「接入 Agent」** 一栏点
+**「一键接入」**；或右键托盘图标 → **「一键接入 Claude / Codex」**。它会把 hooks **安全合并**进
+`~/.claude/settings.json` 和 `~/.codex/hooks.json`（保留你已有的配置，不覆盖，并先写一份
+`.light-backup`），路径自动填好。接入后重启对应的 Claude Code / Codex 即可生效。
 
-最关键的一步：把以下内容合并到你的 `~/.claude/settings.json`，并把 `<LIGHT_DIR>`
-换成你本机 light 项目的绝对路径（Windows 上用正斜杠 `/` 即可，例如
-`C:/Users/你的用户名/light`）：
+下面是手动配置的方式（不想用一键时）。完整说明见 [hooks/README.md](hooks/README.md)。
+
+把以下内容合并到你的 `~/.claude/settings.json`，并把 `<LIGHT_DIR>`
+换成你本机 light 的绝对路径（Windows 上用正斜杠 `/` 即可，例如
+`C:/Users/你的用户名/AppData/Local/Programs/Light`）：
 
 ```json
 {
@@ -93,7 +99,21 @@ curl -X POST http://127.0.0.1:51789/event \
 
 改完后**彻底重启 Claude Code 进程**才会生效。详见 [hooks/README.md](hooks/README.md)。
 
-Codex 用 `hooks/codex-wrap.cmd` 包装调用（详见 hooks 文档）。
+Codex CLI 同理：把下面内容写进 `~/.codex/hooks.json`（事件格式与 Claude 一致），
+模板见 [hooks/codex-hooks.example.json](hooks/codex-hooks.example.json)：
+
+```json
+{
+  "hooks": {
+    "SessionStart":     [{ "matcher": "startup|resume|clear|compact", "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" session_start" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" user_prompt" }] }],
+    "PreToolUse":       [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" tool_use" }] }],
+    "Stop":             [{ "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" stop" }] }]
+  }
+}
+```
+
+老版本 Codex 没有 hooks，可改用 `hooks/codex-wrap.cmd` 包装调用兜底（详见 hooks 文档）。
 
 ## 目录结构
 
@@ -111,7 +131,8 @@ light/
 │   ├── main.ts            # 入口：窗口 / 托盘 / IPC
 │   ├── preload.ts         # 安全 bridge
 │   ├── server.ts          # 本地 HTTP 服务
-│   └── state.ts           # 事件状态机
+│   ├── state.ts           # 事件状态机
+│   └── hooks-setup.ts     # 一键接入：安全合并 hooks 到 Claude/Codex 配置
 ├── src/                   # 渲染层（React + Framer Motion）
 │   ├── App.tsx
 │   ├── main.tsx
@@ -122,13 +143,17 @@ light/
 │       ├── Island.tsx
 │       ├── AgentPill.tsx
 │       └── ExpandPanel.tsx
-└── hooks/                 # 注入 Claude Code / Codex 的脚本
-    ├── claude-hook.mjs    # Node 适配器
-    ├── claude-hook.cmd    # Windows 入口
-    ├── claude-hook.sh     # Unix 入口
-    ├── codex-wrap.mjs     # Codex 包装
-    ├── codex-wrap.cmd     # Windows 入口
-    ├── settings.example.json
+└── hooks/                      # 注入 Claude Code / Codex 的脚本
+    ├── claude-hook.mjs         # Claude Node 适配器
+    ├── claude-hook.cmd         # Windows 入口
+    ├── claude-hook.sh          # Unix 入口
+    ├── codex-hook.mjs          # Codex 官方 hooks 适配器
+    ├── codex-hook.cmd          # Windows 入口
+    ├── codex-hook.sh           # Unix 入口
+    ├── codex-wrap.mjs          # Codex 旧版包装（无 hooks 时回退）
+    ├── codex-wrap.cmd          # Windows 入口
+    ├── settings.example.json   # Claude ~/.claude/settings.json 模板
+    ├── codex-hooks.example.json # Codex ~/.codex/hooks.json 模板
     └── README.md
 ```
 
@@ -179,7 +204,7 @@ v2：通知聚合（微信 / 邮件 / Slack / GitHub）、打包发布、多屏�
 
 ## 已知限制
 
-- Codex 还没正式 hooks，目前只能拿到 start / stop，中间 tool 调用看不到（用包装脚本兜底）。
+- Codex 通过官方 hooks 接入（事件级上报，与 Claude 一致）；但 Codex 没有 SessionEnd 事件，无法像 Claude 那样关窗即消失，因此 Light 在 Codex 安静约 15 秒后自动收起它的胶囊（下次有事件会再出现）。老版本 Codex 无 hooks，只能用包装脚本拿到 start / stop。
 - 仅在 Windows 11 上做过完整验证，macOS / Linux 的透明窗口表现可能有差异。
 - 安装包通过 `npm run dist` + Inno Setup 生成（见 [installer/README.md](installer/README.md)）。
 
