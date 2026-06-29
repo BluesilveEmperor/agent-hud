@@ -1,16 +1,21 @@
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import type { AgentId, AgentStatus, SessionState } from "../types";
+import { contextColor, contextLabel, contextRatio, fmtTokens } from "../usage";
 
 const AGENT_SHORT: Record<AgentId, string> = {
   "claude-code": "Claude",
   codex: "Codex",
   trae: "Trae",
+  opencode: "OpenCode",
+  "deveco-code": "DevEco",
 };
 const AGENT_FULL: Record<AgentId, string> = {
   "claude-code": "Claude Code",
   codex: "Codex",
   trae: "Trae",
+  opencode: "OpenCode",
+  "deveco-code": "DevEco Code",
 };
 
 interface Props {
@@ -69,10 +74,41 @@ export function AgentPill({ agent, sessions, expanded }: Props) {
   const tool = active?.currentTool;
   const timeText =
     status === "working" && active?.startedAt ? elapsed(active.startedAt) : "";
+  const usage = active?.usage;
+  const hasCtx = usage != null && usage.contextTokens != null;
+  // ETA: only show when we have a meaningful estimate (>30s, <4h). Tiny values
+  // are noise; huge ones mean the rate sample is too sparse to trust.
+  const eta = active?.etaSeconds;
+  const etaText =
+    status === "working" && eta != null && eta > 30 && eta < 4 * 3600
+      ? eta < 60
+        ? `~${eta}s`
+        : eta < 3600
+          ? `~${Math.round(eta / 60)}m`
+          : `~${Math.floor(eta / 3600)}h${Math.round((eta % 3600) / 60)}m`
+      : "";
 
   const countBadge =
     count > 1 ? (workingCount > 0 ? `×${count} · ${workingCount}忙` : `×${count}`) : null;
   const seqTag = count === 1 && active ? `对话 ${active.seq}` : null;
+
+  // A slim inline context bar — shown whenever we have a context figure,
+  // regardless of state (you want to see how full the window is even when
+  // idle/done). Rendered as a tiny track with a fill, plus a token count.
+  const ctxBar = hasCtx ? (
+    <span className="ctx-mini" title={`上下文 ${contextLabel(usage)}`}>
+      <span className="ctx-mini-track">
+        <span
+          className="ctx-mini-fill"
+          style={{
+            width: `${Math.round((contextRatio(usage) ?? 0) * 100)}%`,
+            background: contextColor(usage),
+          }}
+        />
+      </span>
+      <span className="ctx-mini-text">{fmtTokens(usage!.contextTokens)}</span>
+    </span>
+  ) : null;
 
   // The chip text is derived purely from `status`, so it can never lag behind
   // the dot colour (no more "green dot but still Bash · 42s"). The element is
@@ -101,11 +137,33 @@ export function AgentPill({ agent, sessions, expanded }: Props) {
               <span className="chip-time">{timeText}</span>
             </>
           )}
+          {etaText && (
+            <>
+              <span className="chip-sep">·</span>
+              <span className="chip-eta" title="预计上下文用尽时间">⏳{etaText}</span>
+            </>
+          )}
+          {ctxBar && expanded && (
+            <>
+              <span className="chip-sep">·</span>
+              {ctxBar}
+            </>
+          )}
         </>
       );
     }
   } else {
-    chip = "空闲";
+    chip = (
+      <>
+        空闲
+        {ctxBar && expanded && (
+          <>
+            <span className="chip-sep">·</span>
+            {ctxBar}
+          </>
+        )}
+      </>
+    );
   }
 
   return (

@@ -11,7 +11,7 @@ interface Props {
   system: SystemState;
 }
 
-const AGENT_ORDER: AgentId[] = ["claude-code", "codex", "trae"];
+const AGENT_ORDER: AgentId[] = ["claude-code", "codex", "opencode", "deveco-code", "trae"];
 
 function groupByAgent(sessions: SessionState[]): Map<AgentId, SessionState[]> {
   const map = new Map<AgentId, SessionState[]>();

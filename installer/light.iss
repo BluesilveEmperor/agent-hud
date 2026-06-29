@@ -11,9 +11,9 @@
 ;  Output:  ..\release\Light-Setup-1.1.0.exe   (per-user, no admin needed)
 ; ============================================================================
 
-#define MyAppName "Light"
+#define MyAppName "AgentHUD"
 #define MyAppVersion "1.1.0"
-#define MyAppPublisher "Light"
+#define MyAppPublisher "AgentHUD"
 #define MyAppExeName "Light.exe"
 
 [Setup]
@@ -45,7 +45,7 @@ MinVersion=10.0
 
 ; Output.
 OutputDir=..\release
-OutputBaseFilename=Light-Setup-{#MyAppVersion}
+OutputBaseFilename=AgentHUD-Setup-{#MyAppVersion}
 Compression=lzma2/ultra
 SolidCompression=yes
 
@@ -70,7 +70,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: autostart
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "立即启动 Light"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "立即启动 {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Make sure a running instance is closed before removing files.

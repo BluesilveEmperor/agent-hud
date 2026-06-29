@@ -1080,3 +1080,214 @@ body,
     animation: none !important;
   }
 }
+
+/* ---- token / context usage ---------------------------------------------- */
+
+/* A session in the expand panel is grouped: the status row on top, the usage
+   breakdown nested underneath. The wrapper only adds vertical spacing. */
+.panel-session {
+  padding: 2px 0;
+  margin: 0 -4px;
+}
+.panel-session + .panel-session {
+  border-top: 1px solid var(--hairline);
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+/* Mini inline context bar shown inside the pill chip (expanded mode only). */
+.ctx-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+}
+.ctx-mini-track {
+  display: inline-block;
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.ctx-mini-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+.ctx-mini-text {
+  font-size: 11px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full usage breakdown under each session row in the expand panel. */
+.usage-row {
+  padding: 4px 4px 6px 22px; /* indent under the status dot */
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.usage-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease, background 0.3s ease;
+}
+.usage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.usage-stat strong {
+  color: var(--text);
+  font-weight: 600;
+  margin: 0 1px;
+}
+.usage-pct {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.usage-model {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+}
+
+/* ---- ETA chip in the pill ---- */
+.chip-eta {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- notify config ---- */
+.notify-url {
+  width: 100%;
+  margin: 6px 4px 2px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+}
+.notify-url:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ---- stats section ---- */
+.stats-agent {
+  padding: 6px 4px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.stats-agent:last-child {
+  border-bottom: none;
+}
+.stats-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 0 22px;
+}
+.stats-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.stats-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--c-working);
+  transition: width 0.5s ease;
+}
+.stats-bar-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+.stats-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 4px 2px 22px;
+}
+.stats-tool-chip {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- history section ---- */
+.hist-row-wrap {
+  border-bottom: 0.5px solid var(--hairline);
+}
+.hist-row-wrap:last-child {
+  border-bottom: none;
+}
+.hist-row {
+  cursor: pointer;
+}
+.hist-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.hist-time {
+  font-size: 11px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+}
+.hist-prompt {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-detail {
+  padding: 2px 4px 8px 22px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.hist-err {
+  color: var(--c-error);
+  margin-bottom: 4px;
+}
+.hist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.hist-model {
+  margin-left: auto;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 10px;
+  opacity: 0.6;
+}

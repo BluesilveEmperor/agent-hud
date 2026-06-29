@@ -1,4 +1,4 @@
-export type AgentId = "claude-code" | "codex" | "trae";
+export type AgentId = "claude-code" | "codex" | "trae" | "opencode" | "deveco-code";
 
 export type AgentStatus = "idle" | "working" | "done" | "error";
 
@@ -11,6 +11,14 @@ export type EventType =
   | "notification"
   | "error";
 
+export interface Usage {
+  contextTokens?: number;
+  contextLimit?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  model?: string;
+}
+
 export interface LightEvent {
   agent: AgentId;
   type: EventType;
@@ -18,6 +26,7 @@ export interface LightEvent {
   tool?: string;
   message?: string;
   timestamp: string;
+  usage?: Usage;
 }
 
 export interface SessionState {
@@ -31,6 +40,8 @@ export interface SessionState {
   lastEventAt: string;
   startedAt?: string;
   recent: LightEvent[];
+  usage?: Usage;
+  etaSeconds?: number;
 }
 
 export interface AppState {
@@ -67,7 +78,7 @@ export interface HotZone {
   h: number;
 }
 
-export type HookAgentKey = "claude" | "codex";
+export type HookAgentKey = "claude" | "codex" | "opencode" | "deveco";
 
 export interface AgentHookStatus {
   agent: HookAgentKey;
@@ -82,12 +93,74 @@ export interface HooksStatus {
   ready: boolean;
   claude: AgentHookStatus;
   codex: AgentHookStatus;
+  opencode: AgentHookStatus;
+  deveco: AgentHookStatus;
 }
 
 export interface HooksInstallResult {
   ok: boolean;
   message: string;
   status: HooksStatus;
+}
+
+// A finished session, as read back from the history store. Mirrors the
+// SessionRecord shape in electron/history.ts.
+export interface SessionRecord {
+  id: string;
+  agent: AgentId;
+  sessionId: string;
+  seq: number;
+  prompt?: string;
+  startedAt?: string;
+  endedAt: string;
+  durationMs?: number;
+  status: "done" | "error" | "idle";
+  toolCount: number;
+  tools: Record<string, number>;
+  usage?: Usage;
+  error?: string;
+}
+
+export interface HistoryQuery {
+  agent?: AgentId;
+  since?: string;
+  until?: string;
+  limit?: number;
+}
+
+export interface AgentStats {
+  agent: AgentId;
+  sessionCount: number;
+  errorCount: number;
+  totalDurationMs: number;
+  totalTokens: number;
+  avgContextTokens?: number;
+  toolCount: number;
+  topTools: { tool: string; count: number }[];
+}
+
+export interface Stats {
+  since: string;
+  until: string;
+  agents: AgentStats[];
+  totalSessions: number;
+  totalErrors: number;
+  totalTokens: number;
+  totalDurationMs: number;
+  topTools: { tool: string; count: number }[];
+}
+
+export interface NotifyConfig {
+  osEnabled: boolean;
+  webhookEnabled: boolean;
+  webhookUrl: string;
+  minDurationMs: number;
+}
+
+export interface NotifyTestResult {
+  os: boolean;
+  webhook: boolean;
+  error?: string;
 }
 
 declare global {
@@ -111,7 +184,13 @@ declare global {
       clearEvents: () => void;
       removeSession: (key: string) => void;
       getHooksStatus: () => Promise<HooksStatus>;
-      installHooks: (agent: HookAgentKey | "both") => Promise<HooksInstallResult>;
+      installHooks: (agent: HookAgentKey | "all") => Promise<HooksInstallResult>;
+      getHistory: (q?: HistoryQuery) => Promise<SessionRecord[]>;
+      getStats: (opts?: { since?: string; until?: string }) => Promise<Stats | null>;
+      getNotifyConfig: () => Promise<NotifyConfig>;
+      setNotifyConfig: (patch: Partial<NotifyConfig>) => Promise<NotifyConfig>;
+      testNotify: () => Promise<NotifyTestResult>;
+      onHistoryUpdated: (cb: () => void) => () => void;
       mediaControl: (action: MediaAction) => void;
       setHotZones: (zones: HotZone[]) => void;
       quit: () => void;

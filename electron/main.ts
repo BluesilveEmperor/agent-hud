@@ -1,12 +1,14 @@
 import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
-import { StateStore, type LightEvent, type AppState } from "./state";
+import { StateStore, type LightEvent, type AppState, type SessionState } from "./state";
 import { DEFAULT_PORT, startServer } from "./server";
 import { MemoStore, type Memo } from "./memos";
 import { SystemStore, type SystemState } from "./system";
 import { WinBridge, type MediaAction } from "./winbridge";
 import { getHooksStatus, installHooks, type InstallTarget } from "./hooks-setup";
+import { HistoryStore, type HistoryQuery, type SessionRecord } from "./history";
+import { Notifier, type NotifyConfig } from "./notifier";
 
 interface HotZone {
   x: number;
@@ -30,6 +32,8 @@ const store = new StateStore();
 const systemStore = new SystemStore();
 let memoStore: MemoStore | null = null;
 let winBridge: WinBridge | null = null;
+let historyStore: HistoryStore | null = null;
+let notifier: Notifier | null = null;
 
 function getDevServerUrl(): string | undefined {
   return process.env.VITE_DEV_SERVER_URL;
@@ -177,9 +181,9 @@ function createTray(): void {
       },
       { type: "separator" },
       {
-        label: "一键接入 Claude / Codex",
+        label: "一键接入全部 Agent",
         click: () => {
-          const result = installHooks("both");
+          const result = installHooks("all");
           dialog.showMessageBox({
             type: result.ok ? "info" : "warning",
             title: "Light · 接入",
@@ -241,10 +245,37 @@ function wireIpc(): void {
   });
   ipcMain.handle("light:get-hooks-status", () => getHooksStatus());
   ipcMain.handle("light:install-hooks", (_evt, agent: InstallTarget) => {
-    const target: InstallTarget =
-      agent === "claude" || agent === "codex" || agent === "both" ? agent : "both";
+    const valid: InstallTarget[] = [
+      "claude",
+      "codex",
+      "opencode",
+      "deveco",
+      "all",
+      "both",
+    ];
+    const target: InstallTarget = valid.includes(agent) ? agent : "all";
     return installHooks(target);
   });
+
+  // History & stats
+  ipcMain.handle("light:get-history", (_evt, q: HistoryQuery | undefined) => {
+    return historyStore?.query(q ?? {}) ?? ([] as SessionRecord[]);
+  });
+  ipcMain.handle("light:get-stats", (_evt, opts: { since?: string; until?: string } | undefined) => {
+    return historyStore?.stats(opts ?? {}) ?? null;
+  });
+
+  // Notifications
+  ipcMain.handle("light:get-notify-config", (): NotifyConfig => {
+    return notifier?.getConfig() ?? { osEnabled: true, webhookEnabled: false, webhookUrl: "", minDurationMs: 8000 };
+  });
+  ipcMain.handle("light:set-notify-config", (_evt, patch: Partial<NotifyConfig>): NotifyConfig => {
+    return notifier?.setConfig(patch) ?? { osEnabled: true, webhookEnabled: false, webhookUrl: "", minDurationMs: 8000 };
+  });
+  ipcMain.handle("light:test-notify", async () => {
+    return notifier ? await notifier.test() : { os: false, webhook: false, error: "notifier not ready" };
+  });
+
   ipcMain.on("light:quit", () => app.quit());
 
   store.on("state", (state: AppState) => {
@@ -254,17 +285,52 @@ function wireIpc(): void {
     mainWindow?.webContents.send("light:event", evt);
   });
 
+  // When a session is retired (done/error/idle → dropped), record it into
+  // history and fire the completion notification. This is the single choke
+  // point where "a task finished" becomes both a persistent record and a
+  // potentially cross-scene alert.
+  store.on("retire", (session: SessionState) => {
+    if (historyStore) {
+      const durationMs = session.startedAt
+        ? new Date(session.lastEventAt).getTime() - new Date(session.startedAt).getTime()
+        : undefined;
+      historyStore.record({
+        agent: session.agent,
+        sessionId: session.sessionId,
+        seq: session.seq,
+        prompt: session.lastPrompt,
+        startedAt: session.startedAt,
+        endedAt: session.lastEventAt,
+        durationMs,
+        status: session.status === "error" ? "error" : session.status === "done" ? "done" : "idle",
+        events: session.recent,
+        usage: session.usage,
+        error: session.status === "error" ? session.lastPrompt : undefined,
+      });
+      mainWindow?.webContents.send("light:history-updated");
+    }
+    // Only notify on done/error — a session that quietly idled out (GC'd
+    // after 30 min) isn't worth a popup.
+    if (notifier && (session.status === "done" || session.status === "error")) {
+      notifier.notify(session);
+    }
+  });
+
   systemStore.on("change", (state: SystemState) => {
     mainWindow?.webContents.send("light:system", state);
   });
 }
 
 app.whenReady().then(() => {
-  const memosPath = path.join(app.getPath("userData"), "memos.json");
+  const userData = app.getPath("userData");
+  const memosPath = path.join(userData, "memos.json");
   memoStore = new MemoStore(memosPath);
   memoStore.on("change", (list: Memo[]) => {
     mainWindow?.webContents.send("light:memos", list);
   });
+
+  historyStore = new HistoryStore(path.join(userData, "history.jsonl"));
+  notifier = new Notifier(userData);
 
   startServer(store, DEFAULT_PORT);
   createWindow();

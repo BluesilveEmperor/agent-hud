@@ -59,6 +59,7 @@ export function startServer(store: StateStore, port: number = DEFAULT_PORT): htt
             tool: body.tool,
             message: body.message,
             timestamp: body.timestamp ?? new Date().toISOString(),
+            usage: body.usage,
           };
           const ingested = store.ingest(evt);
           res.statusCode = 200;

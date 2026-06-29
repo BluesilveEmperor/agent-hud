@@ -48,6 +48,16 @@ contextBridge.exposeInMainWorld("light", {
   removeSession: (key: string) => ipcRenderer.send("light:remove-session", key),
   getHooksStatus: () => ipcRenderer.invoke("light:get-hooks-status"),
   installHooks: (agent: string) => ipcRenderer.invoke("light:install-hooks", agent),
+  getHistory: (q: unknown) => ipcRenderer.invoke("light:get-history", q),
+  getStats: (opts: unknown) => ipcRenderer.invoke("light:get-stats", opts),
+  getNotifyConfig: () => ipcRenderer.invoke("light:get-notify-config"),
+  setNotifyConfig: (patch: Record<string, unknown>) => ipcRenderer.invoke("light:set-notify-config", patch),
+  testNotify: () => ipcRenderer.invoke("light:test-notify"),
+  onHistoryUpdated: (cb: () => void) => {
+    const listener = () => cb();
+    ipcRenderer.on("light:history-updated", listener);
+    return () => ipcRenderer.off("light:history-updated", listener);
+  },
   mediaControl: (action: string) => ipcRenderer.send("light:media-control", action),
   setHotZones: (zones: HotZone[]) => ipcRenderer.send("light:set-hot-zones", zones),
   quit: () => ipcRenderer.send("light:quit"),
