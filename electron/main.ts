@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, dialog, nativeTheme } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { StateStore, type LightEvent, type AppState, type SessionState } from "./state";
@@ -9,6 +9,7 @@ import { WinBridge, type MediaAction } from "./winbridge";
 import { getHooksStatus, installHooks, type InstallTarget } from "./hooks-setup";
 import { HistoryStore, type HistoryQuery, type SessionRecord } from "./history";
 import { Notifier, type NotifyConfig } from "./notifier";
+import { ThemeStore, type Theme, type EffectiveTheme } from "./theme";
 
 interface HotZone {
   x: number;
@@ -34,6 +35,7 @@ let memoStore: MemoStore | null = null;
 let winBridge: WinBridge | null = null;
 let historyStore: HistoryStore | null = null;
 let notifier: Notifier | null = null;
+let themeStore: ThemeStore | null = null;
 
 function getDevServerUrl(): string | undefined {
   return process.env.VITE_DEV_SERVER_URL;
@@ -70,7 +72,7 @@ function createWindow(): void {
     transparent: true,
     alwaysOnTop: true,
     resizable: false,
-    movable: false,
+    movable: true,
     skipTaskbar: true,
     hasShadow: false,
     focusable: true,
@@ -99,6 +101,9 @@ function createWindow(): void {
   mainWindow.once("ready-to-show", () => {
     mainWindow?.showInactive();
     startCursorPoll();
+    // Apply the persisted theme before the capsule becomes visible, so there's
+    // no dark→light flash on a light-mode user's screen.
+    pushThemeToRenderer();
   });
 
   // Click outside the island/panel (focus moves to another app) → collapse panel.
@@ -170,6 +175,7 @@ function createTray(): void {
   tray = new Tray(trayImg);
   tray.setToolTip("Light · 桌面状态胶囊");
   const refresh = () => {
+    const cur = themeStore?.get() ?? "dark";
     const menu = Menu.buildFromTemplate([
       {
         label: mainWindow?.isVisible() ? "Hide" : "Show",
@@ -195,6 +201,30 @@ function createTray(): void {
         },
       },
       { type: "separator" },
+      {
+        label: "主题",
+        submenu: [
+          {
+            label: "深色",
+            type: "radio",
+            checked: cur === "dark",
+            click: () => applyTheme("dark"),
+          },
+          {
+            label: "浅色",
+            type: "radio",
+            checked: cur === "light",
+            click: () => applyTheme("light"),
+          },
+          {
+            label: "跟随系统",
+            type: "radio",
+            checked: cur === "auto",
+            click: () => applyTheme("auto"),
+          },
+        ],
+      },
+      { type: "separator" },
       { label: `HTTP :${DEFAULT_PORT}`, enabled: false },
       { type: "separator" },
       { label: "Quit", click: () => app.quit() },
@@ -208,6 +238,80 @@ function createTray(): void {
     else mainWindow.showInactive();
     refresh();
   });
+}
+
+// Push the current effective theme to the renderer by toggling the `light`
+// class on <html>. Called on startup (after the page loads), on every theme
+// change, and when the OS theme flips while in "auto" mode.
+function pushThemeToRenderer(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const eff: EffectiveTheme = themeStore?.effective() ?? "dark";
+  // Add the class that matches, remove the other. We use both classes so the
+  // CSS can target either mode explicitly (and survives a missed event).
+  const addClass = eff === "light" ? "light" : "dark";
+  const removeClass = eff === "light" ? "dark" : "light";
+  mainWindow.webContents.executeJavaScript(
+    `document.documentElement.classList.remove('${removeClass}');` +
+    `document.documentElement.classList.add('${addClass}');`,
+  ).catch(() => { /* window may be loading */ });
+  mainWindow.webContents.send("light:theme", { theme: themeStore?.get() ?? "dark", effective: eff });
+  tray?.setContextMenu(Menu.buildFromTemplate([])); // force tray menu rebuild on next open
+  // Rebuild tray menu so the radio reflects the new selection. We can't just
+  // call refresh() because it's local to createTray; instead we recreate by
+  // re-reading themeStore. Simpler: emit an event the tray rebuilds on.
+  rebuildTrayMenu();
+}
+
+// Avoid circular ref with createTray: rebuild the menu from a standalone
+// helper. This keeps the radio buttons in sync after a theme change.
+function rebuildTrayMenu(): void {
+  if (!tray) return;
+  const cur = themeStore?.get() ?? "dark";
+  const menu = Menu.buildFromTemplate([
+    {
+      label: mainWindow?.isVisible() ? "Hide" : "Show",
+      click: () => {
+        if (!mainWindow) return;
+        if (mainWindow.isVisible()) mainWindow.hide();
+        else mainWindow.showInactive();
+      },
+    },
+    { type: "separator" },
+    {
+      label: "一键接入全部 Agent",
+      click: () => {
+        const result = installHooks("all");
+        dialog.showMessageBox({
+          type: result.ok ? "info" : "warning",
+          title: "Light · 接入",
+          message: result.ok ? "接入完成" : "接入未全部成功",
+          detail: result.message,
+          buttons: ["好的"],
+          noLink: true,
+        });
+      },
+    },
+    { type: "separator" },
+    {
+      label: "主题",
+      submenu: [
+        { label: "深色", type: "radio", checked: cur === "dark", click: () => applyTheme("dark") },
+        { label: "浅色", type: "radio", checked: cur === "light", click: () => applyTheme("light") },
+        { label: "跟随系统", type: "radio", checked: cur === "auto", click: () => applyTheme("auto") },
+      ],
+    },
+    { type: "separator" },
+    { label: `HTTP :${DEFAULT_PORT}`, enabled: false },
+    { type: "separator" },
+    { label: "Quit", click: () => app.quit() },
+  ]);
+  tray.setContextMenu(menu);
+}
+
+function applyTheme(t: Theme): void {
+  if (!themeStore) return;
+  themeStore.set(t);
+  pushThemeToRenderer();
 }
 
 function wireIpc(): void {
@@ -276,6 +380,16 @@ function wireIpc(): void {
     return notifier ? await notifier.test() : { os: false, webhook: false, error: "notifier not ready" };
   });
 
+  // Theme
+  ipcMain.handle("light:get-theme", (): { theme: Theme; effective: EffectiveTheme } => {
+    return { theme: themeStore?.get() ?? "dark", effective: themeStore?.effective() ?? "dark" };
+  });
+  ipcMain.handle("light:set-theme", (_evt, t: Theme) => {
+    if (t !== "light" && t !== "dark" && t !== "auto") return null;
+    applyTheme(t);
+    return { theme: themeStore?.get() ?? "dark", effective: themeStore?.effective() ?? "dark" };
+  });
+
   ipcMain.on("light:quit", () => app.quit());
 
   store.on("state", (state: AppState) => {
@@ -331,11 +445,19 @@ app.whenReady().then(() => {
 
   historyStore = new HistoryStore(path.join(userData, "history.jsonl"));
   notifier = new Notifier(userData);
+  themeStore = new ThemeStore(userData);
 
   startServer(store, DEFAULT_PORT);
   createWindow();
   createTray();
   wireIpc();
+
+  // In "auto" mode, follow the OS theme: when the user flips Windows between
+  // light/dark, we re-resolve and push the new effective colour to the
+  // renderer + tray menu immediately.
+  nativeTheme.on("updated", () => {
+    if (themeStore?.get() === "auto") pushThemeToRenderer();
+  });
 
   // Windows bridge: SMTC media + notification listener. Dev: <root>/bridge.
   const bridgeDir = path.join(__dirname, "..", "bridge");

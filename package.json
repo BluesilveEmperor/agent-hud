@@ -1,9 +1,9 @@
 {
-  "name": "light",
-  "version": "1.1.0",
+  "name": "agent-hud",
+  "version": "2.0.0",
   "private": true,
-  "description": "桌面状态胶囊 · 实时显示 Claude Code 与 Codex 的工作状态",
-  "author": "Light",
+  "description": "桌面状态胶囊 · 实时显示 Claude Code / Codex / OpenCode / DevEco Code 的工作状态、token 用量与上下文占用",
+  "author": "AgentHUD",
   "license": "MIT",
   "main": "dist-electron/main.js",
   "scripts": {

@@ -163,6 +163,14 @@ export interface NotifyTestResult {
   error?: string;
 }
 
+export type Theme = "light" | "dark" | "auto";
+export type EffectiveTheme = "light" | "dark";
+
+export interface ThemeState {
+  theme: Theme;
+  effective: EffectiveTheme;
+}
+
 declare global {
   interface Window {
     light: {
@@ -190,6 +198,9 @@ declare global {
       getNotifyConfig: () => Promise<NotifyConfig>;
       setNotifyConfig: (patch: Partial<NotifyConfig>) => Promise<NotifyConfig>;
       testNotify: () => Promise<NotifyTestResult>;
+      getTheme: () => Promise<ThemeState>;
+      setTheme: (t: Theme) => Promise<ThemeState>;
+      onTheme: (cb: (t: ThemeState) => void) => () => void;
       onHistoryUpdated: (cb: () => void) => () => void;
       mediaControl: (action: MediaAction) => void;
       setHotZones: (zones: HotZone[]) => void;

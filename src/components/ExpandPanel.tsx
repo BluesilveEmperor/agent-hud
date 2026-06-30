@@ -12,6 +12,8 @@ import type {
   Stats,
   SessionRecord,
   NotifyConfig,
+  Theme,
+  ThemeState,
 } from "../types";
 import { MediaFull } from "./MediaCard";
 import {
@@ -154,6 +156,10 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
 
       <motion.div className="section" variants={ITEM}>
         <HistorySection />
+      </motion.div>
+
+      <motion.div className="section" variants={ITEM}>
+        <ThemeSection />
       </motion.div>
 
       {system.media && system.media.title && (
@@ -532,6 +538,41 @@ function HistorySection() {
             </div>
           );
         })}
+      </div>
+    </>
+  );
+}
+
+// ---- Theme switcher --------------------------------------------------------
+
+function ThemeSection() {
+  const [state, setState] = useState<ThemeState | null>(null);
+  useEffect(() => {
+    window.light?.getTheme().then(setState).catch(() => {});
+    return window.light?.onTheme((t) => setState(t));
+  }, []);
+
+  const pick = (t: Theme) => window.light?.setTheme(t).then(setState);
+
+  const opts: { key: Theme; label: string }[] = [
+    { key: "dark", label: "深色" },
+    { key: "light", label: "浅色" },
+    { key: "auto", label: "跟随系统" },
+  ];
+
+  return (
+    <>
+      <div className="section-head"><span>主题</span></div>
+      <div className="theme-row">
+        {opts.map((o) => (
+          <button
+            key={o.key}
+            className={`theme-btn ${state?.theme === o.key ? "active" : ""}`}
+            onClick={() => pick(o.key)}
+          >
+            {o.label}
+          </button>
+        ))}
       </div>
     </>
   );

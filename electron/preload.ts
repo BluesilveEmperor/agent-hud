@@ -53,6 +53,13 @@ contextBridge.exposeInMainWorld("light", {
   getNotifyConfig: () => ipcRenderer.invoke("light:get-notify-config"),
   setNotifyConfig: (patch: Record<string, unknown>) => ipcRenderer.invoke("light:set-notify-config", patch),
   testNotify: () => ipcRenderer.invoke("light:test-notify"),
+  getTheme: () => ipcRenderer.invoke("light:get-theme"),
+  setTheme: (t: string) => ipcRenderer.invoke("light:set-theme", t),
+  onTheme: (cb: (t: { theme: string; effective: string }) => void) => {
+    const listener = (_: unknown, v: { theme: string; effective: string }) => cb(v);
+    ipcRenderer.on("light:theme", listener);
+    return () => ipcRenderer.off("light:theme", listener);
+  },
   onHistoryUpdated: (cb: () => void) => {
     const listener = () => cb();
     ipcRenderer.on("light:history-updated", listener);

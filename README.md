@@ -1,28 +1,55 @@
 # AGENT HUD · 桌面状态胶囊
 
-> 屏幕顶部常驻的悬浮胶囊，实时展示 **Claude Code / Codex / OpenCode / DevEco Code** 的工作状态。
+> 屏幕常驻的悬浮胶囊，实时展示 **Claude Code / Codex / OpenCode / DevEco Code** 的工作状态、token 用量与上下文占用。
 > 磨砂玻璃质感，余光一瞥就知道 AI 在干活、做完了还是出错了，不用切窗口。
 
-基于 [chai1220/light](https://github.com/chai1220/light) 扩展，新增 OpenCode 与
-DevEco Code（基于 OpenCode 定制）的接入能力。详细的产品设计见 [PRD.md](PRD.md)。
+基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换等功能。
 
-## 功能
+## 功能一览
 
-- **状态一目了然**：工作中泛蓝光呼吸、完成变绿打勾、出错变红，还显示当前工具与用时。
-- **多会话 / 多 agent**：Claude Code、Codex、OpenCode、DevEco Code 同时跑也能分栏显示，互不打架。
-- **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code 自动拷贝 plugin（安全、不覆盖、自动备份）。
-- **顺手的小工具**：桌面备忘录、当前播放的音乐（可上一首 / 下一首 / 暂停）。
-- **磨砂玻璃 UI**：任何壁纸下都清晰；鼠标移上去展开详情面板。
-- **纯本地**：只监听 `127.0.0.1`，不联网、不上传任何数据。
+### 状态展示
+- **状态一目了然**：工作中泛蓝光呼吸、完成变绿打勾、出错变红抖动，显示当前工具与用时
+- **多会话 / 多 agent**：Claude Code、Codex、OpenCode、DevEco Code 同时跑也能分栏显示
+- **可拖动胶囊**：按住胶囊边缘空白处即可拖到屏幕任意位置，点击内容区展开/收起面板
+
+### Token 用量与上下文
+- **上下文进度条**：实时显示当前上下文窗口占用（如 87k / 200k），颜色随占用率变化（绿 < 70% < 琥珀 < 90% < 红）
+- **Token 统计**：当前上下文 token 数、本次输出 token、会话累计 token
+- **完成预测 ETA**：根据 token 消耗速率估算"上下文还需多久填满"，显示在胶囊上（如 `⏳~4m`）
+- **数据来源**：Claude Code 解析 transcript jsonl 获取真实 usage；OpenCode/DevEco 从 message API 读取
+
+### 完成通知
+- **系统通知**：会话完成/出错时弹出 Windows toast 通知，标题 + prompt 摘要 + 耗时 + token 数
+- **Webhook**：可选推送到企业微信 / 飞书 / Slack / 自建服务，让你不在电脑前也能收到
+- **防抖**：8 秒以下短任务不通知，同一会话 30 秒内不重复通知
+
+### 会话历史
+- **持久化记录**：每个完成的会话落盘到本地 `history.jsonl`（自动保留 30 天）
+- **历史回放**：展开面板查看今日历史，点开看详情——工具调用分布、上下文用量、模型、错误信息
+
+### Agent 行为分析
+- **今日统计**：各 agent 的会话数、错误数、总耗时、总 token（带对比柱状图）
+- **工具排行**：最常用工具 Top 5
+- **平均上下文**：了解你的 agent 上下文使用习惯
+
+### 主题与外观
+- **三种主题**：深色（默认）/ 浅色 / 跟随系统，托盘菜单或面板内一键切换
+- **磨砂玻璃 UI**：任何壁纸下都清晰，深浅模式均适配
+
+### 其他
+- **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code 自动拷贝 plugin
+- **桌面备忘录**：随手记下待办
+- **媒体控制**：显示当前播放的音乐，可上一首/下一首/暂停
+- **纯本地**：只监听 `127.0.0.1`，不联网、不上传任何数据
 
 ## 截图（示意）
 
 ```
-       ╭──────────────────────────────────────────────────────────╮
-       │ ● Claude Edit │ ● Codex idle │ ● OpenCode Bash │ ● DevEco │
-       ╰──────────────────────────────────────────────────────────╯
-              hover → 展开当前任务摘要
-              click → 展开事件流面板
+       ╭──────────────────────────────────────────────────────────────╮
+       │ ● Claude Bash · 42s · ⏳~4m · ▓▓░░ 87k │ ● OpenCode 完成    │
+       ╰──────────────────────────────────────────────────────────────╯
+              hover → 展开当前任务摘要 + 上下文进度条
+              click → 展开事件流 / 历史 / 统计 / 通知设置 / 主题
 ```
 
 - `●` 灰：idle
@@ -35,155 +62,86 @@ DevEco Code（基于 OpenCode 定制）的接入能力。详细的产品设计�
 依赖：Node 18+、Windows / macOS / Linux。
 
 ```bash
-# 1. 装依赖（首次约 5 分钟，Electron 30.5.1 会优先用本地缓存）
+# 1. 装依赖（国内网络建议加镜像）
 npm install
 
 # 2. 启动开发模式（Vite + Electron）
 npm run dev
 ```
 
-启动成功后，屏幕顶部中央会出现一个深色的胶囊条。把鼠标移上去会展开摘要，点击会展开事件面板。
+启动后屏幕顶部中央出现胶囊。鼠标移上去展开摘要，点击展开完整面板。
 
-## 验证一下没装 hook 时也能看到效果
-
-打开一个新终端，发个测试事件：
-
-```powershell
-# Windows PowerShell
-Invoke-RestMethod -Uri http://127.0.0.1:51789/event -Method POST -ContentType 'application/json' -Body (@{
-  agent = 'opencode'
-  type = 'user_prompt'
-  message = 'Refactor the auth middleware'
-} | ConvertTo-Json)
-```
+### 打包安装包
 
 ```bash
-# macOS / Linux
-curl -X POST http://127.0.0.1:51789/event \
-  -H "Content-Type: application/json" \
-  -d '{"agent":"deveco-code","type":"tool_use","tool":"bash","message":"npm test"}'
-```
+# 构建并 stage 到 release/Light/
+npm run dist
 
-胶囊会切换到蓝色 "working" 状态。再发 `{"agent":"opencode","type":"stop"}` 会变绿，8 秒后回灰。
+# 用 Inno Setup 编译安装包（需安装 Inno Setup 6）
+iscc installer/light.iss
+# → release/AgentHUD-Setup-2.0.0.exe
+```
 
 ## 接入 Agent
 
-**最简单的方式（推荐）：** 打开 HUD，鼠标移到胶囊上展开面板 → **「接入 Agent」** 一栏点
-**「一键接入」**；或右键托盘图标 → **「一键接入全部 Agent」**。它会按各 agent 的接入方式
-自动配置：
+**最简单的方式：** 展开胶囊面板 →「接入 Agent」→「一键接入」，自动配置全部四个 agent。或右键托盘 →「一键接入全部 Agent」。
 
 | Agent | 接入方式 | 写入位置 |
 |---|---|---|
 | Claude Code | 合并 hooks JSON | `~/.claude/settings.json` |
 | Codex | 合并 hooks JSON | `~/.codex/hooks.json` |
-| OpenCode | 拷贝 plugin | `~/.config/opencode/plugins/light-hud.mjs` |
-| DevEco Code | 拷贝 plugin | `~/.config/deveco/plugins/light-hud.mjs` |
+| OpenCode | 拷贝 plugin | `~/.config/opencode/plugins/light-hud.js` |
+| DevEco Code | 拷贝 plugin | `~/.config/deveco/plugins/light-hud.js` |
 
-全程保留已有配置、不覆盖、先写 `.light-backup` 备份，路径自动填好。接入后重启对应 agent 即可生效。
-
-下面是手动配置的方式（不想用一键时）。完整说明见 [hooks/README.md](hooks/README.md)。
-
-### Claude Code
-
-把以下内容合并到 `~/.claude/settings.json`，`<LIGHT_DIR>` 换成本机项目绝对路径
-（Windows 上用正斜杠 `/` 即可）：
-
-```json
-{
-  "hooks": {
-    "SessionStart":    [{ "hooks": [{ "type": "command", "command": "node <LIGHT_DIR>/hooks/claude-hook.mjs session_start" }] }],
-    "SessionEnd":      [{ "hooks": [{ "type": "command", "command": "node <LIGHT_DIR>/hooks/claude-hook.mjs session_end" }] }],
-    "UserPromptSubmit":[{ "hooks": [{ "type": "command", "command": "node <LIGHT_DIR>/hooks/claude-hook.mjs user_prompt" }] }],
-    "PreToolUse":      [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node <LIGHT_DIR>/hooks/claude-hook.mjs tool_use" }] }],
-    "Stop":            [{ "hooks": [{ "type": "command", "command": "node <LIGHT_DIR>/hooks/claude-hook.mjs stop" }] }]
-  }
-}
-```
-
-改完后**彻底重启 Claude Code 进程**才会生效。
-
-### Codex CLI
-
-把下面内容写进 `~/.codex/hooks.json`（模板见 [hooks/codex-hooks.example.json](hooks/codex-hooks.example.json)）：
-
-```json
-{
-  "hooks": {
-    "SessionStart":     [{ "matcher": "startup|resume|clear|compact", "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" session_start" }] }],
-    "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" user_prompt" }] }],
-    "PreToolUse":       [{ "matcher": "*", "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" tool_use" }] }],
-    "Stop":             [{ "hooks": [{ "type": "command", "command": "node \"<LIGHT_DIR>/hooks/codex-hook.mjs\" stop" }] }]
-  }
-}
-```
-
-老版本 Codex 没有 hooks，可改用 `hooks/codex-wrap.cmd` 包装调用兜底。
-
-### OpenCode / DevEco Code
-
-OpenCode 与 DevEco Code（基于 OpenCode 定制）共用一套 **plugin 事件钩子**机制。把
-`hooks/opencode/light-hud.mjs` 拷贝到对应 plugins 目录即可（OpenCode 启动时自动加载，
-无需改 `opencode.json`）：
-
-```bash
-# OpenCode
-mkdir -p ~/.config/opencode/plugins
-cp hooks/opencode/light-hud.mjs ~/.config/opencode/plugins/
-
-# DevEco Code
-mkdir -p ~/.config/deveco/plugins
-cp hooks/opencode/light-hud.mjs ~/.config/deveco/plugins/
-```
-
-插件会按安装路径自动上报身份（`opencode` / `deveco-code`），订阅 `session.created`、
-`tool.execute.before`、`session.idle` 等事件转发给 HUD。详见
-[hooks/opencode/README.md](hooks/opencode/README.md)。
-
-不支持 plugin 的老版本可用 `hooks/opencode-wrap.cmd` / `hooks/deveco-wrap.cmd` 包装兜底。
+全程保留已有配置、不覆盖、先写 `.light-backup` 备份。接入后重启对应 agent 即可生效。手动配置方式见 [hooks/README.md](hooks/README.md)。
 
 ## 目录结构
 
 ```
 agent-hud/
-├── PRD.md                 # 产品需求文档
 ├── package.json
-├── tsconfig.json          # 渲染层 TS 配置
-├── tsconfig.electron.json # 主进程 TS 配置
+├── tsconfig.json / tsconfig.electron.json
 ├── vite.config.ts
 ├── index.html
 ├── scripts/
-│   └── dev.mjs            # 开发启动脚本（先 Vite 后 Electron）
-├── electron/              # 主进程（Node）
-│   ├── main.ts            # 入口：窗口 / 托盘 / IPC
-│   ├── preload.ts         # 安全 bridge
-│   ├── server.ts          # 本地 HTTP 服务
-│   ├── state.ts           # 事件状态机（支持 5 种 agent）
-│   └── hooks-setup.ts     # 一键接入：Claude/Codex 合并 JSON，OpenCode/DevEco 拷贝 plugin
-├── src/                   # 渲染层（React + Framer Motion）
+│   ├── dev.mjs               # 开发启动脚本
+│   └── stage.mjs             # 打包 stage 脚本
+├── electron/                  # 主进程（Node）
+│   ├── main.ts               # 入口：窗口 / 托盘 / IPC / 主题
+│   ├── preload.ts            # 安全 bridge
+│   ├── server.ts             # 本地 HTTP 服务 (127.0.0.1:51789)
+│   ├── state.ts              # 事件状态机 + ETA 预测
+│   ├── memos.ts              # 备忘录持久化
+│   ├── system.ts             # 系统状态（媒体等）
+│   ├── winbridge.ts          # Windows SMTC / 通知
+│   ├── hooks-setup.ts        # 一键接入（hooks JSON / plugin 双模式）
+│   ├── history.ts            # 会话历史持久化 + 统计
+│   ├── notifier.ts           # 完成通知（系统通知 + webhook）
+│   └── theme.ts              # 主题存储（深色/浅色/跟随系统）
+├── src/                       # 渲染层（React + Framer Motion）
 │   ├── App.tsx
 │   ├── main.tsx
 │   ├── styles.css
 │   ├── types.ts
+│   ├── usage.ts              # token 格式化工具
 │   ├── hooks/useLightEvents.ts
 │   └── components/
-│       ├── Island.tsx
-│       ├── AgentPill.tsx
-│       └── ExpandPanel.tsx
-└── hooks/                      # 注入各 agent 的脚本
-    ├── claude-hook.mjs         # Claude Code 适配器
-    ├── claude-hook.cmd / .sh
-    ├── codex-hook.mjs          # Codex 官方 hooks 适配器
-    ├── codex-hook.cmd / .sh
-    ├── codex-wrap.mjs / .cmd   # Codex 旧版包装兜底
-    ├── opencode/               # OpenCode / DevEco Code 接入
-    │   ├── light-hud.mjs       # plugin（按路径自动识别 opencode / deveco-code）
-    │   └── README.md
-    ├── agent-wrap.mjs          # OpenCode/DevEco 通用包装兜底
-    ├── opencode-wrap.cmd / .sh
-    ├── deveco-wrap.cmd / .sh
-    ├── settings.example.json   # Claude settings 模板
-    ├── codex-hooks.example.json # Codex hooks 模板
-    └── README.md
+│       ├── Island.tsx        # 胶囊主体（可拖动）
+│       ├── AgentPill.tsx     # 单 agent 分栏
+│       ├── ExpandPanel.tsx   # 展开面板（状态/接入/通知/统计/历史/主题）
+│       └── MediaCard.tsx     # 媒体控制
+├── hooks/                     # 注入各 agent 的脚本
+│   ├── claude-hook.mjs       # Claude Code（解析 transcript 上报 usage）
+│   ├── codex-hook.mjs        # Codex
+│   ├── opencode/
+│   │   └── light-hud.js      # OpenCode / DevEco Code plugin
+│   ├── agent-wrap.mjs        # 通用包装兜底
+│   └── README.md             # 手动接入说明
+├── bridge/                    # Windows PowerShell 辅助脚本
+├── installer/
+│   ├── light.iss             # Inno Setup 脚本
+│   └── light.ico
+└── PRD.md                     # 产品需求文档
 ```
 
 ## HTTP API
@@ -197,50 +155,38 @@ agent-hud/
   "sessionId": "可选",
   "tool": "可选，tool_use 时填工具名",
   "message": "可选，文本摘要",
+  "usage": {
+    "contextTokens": 87420,
+    "contextLimit": 200000,
+    "outputTokens": 1240,
+    "totalTokens": 312480,
+    "model": "claude-sonnet-4-5"
+  },
   "timestamp": "可选，ISO8601"
 }
 ```
 
-`GET /health` 健康检查；`GET /state` 拿当前状态（调试用）。
+`GET /health` 健康检查；`GET /state` 拿当前状态。
 
 ## 隐私与安全
 
-- **纯本地运行**：HTTP 服务只绑定 `127.0.0.1`，不监听公网，外部机器无法访问。
-- **不联网、不收集数据**：没有任何遥测 / 上报；备忘录只存在本机
-  `%AppData%\light\memos.json`。
-- **渲染层隔离**：`contextIsolation: true`、`nodeIntegration: false`，页面拿不到
-  Node 能力。
-- **不执行任意命令**：`/event` 只接收字符串字段用于显示，服务端不会据此执行 shell；
-  媒体控制只接受固定的枚举动作。
-- 本地端口 `51789` 无鉴权（按设计——只有本机程序能访问）。如果你介意同机其他程序
-  往里发"假状态"，可自行加 token 校验。
+- **纯本地运行**：HTTP 服务只绑定 `127.0.0.1`，不监听公网
+- **不联网、不收集数据**：没有遥测/上报；备忘录、历史、配置只存在本机 `%AppData%`
+- **渲染层隔离**：`contextIsolation: true`、`nodeIntegration: false`
+- **不执行任意命令**：`/event` 只接收字符串字段用于显示
 
-## 状态机
+## 技术栈
 
-| 事件 | 状态变化 |
-|---|---|
-| `session_start` | → `idle`，清空 currentTool |
-| `user_prompt` | → `working`，记录 startedAt 与 lastPrompt |
-| `tool_use` | → `working`，更新 currentTool |
-| `stop` | → `done`，8 秒后自动转 `idle` |
-| `error` | → `error`，5 秒后自动转 `idle` |
-| `notification` | 不改状态，只入事件流 |
-
-## 已知限制
-
-- Codex / OpenCode / DevEco Code 都没有 Claude Code 那种「关窗即 SessionEnd」的可靠
-  信号：会话在 `stop` 后变"完成"，安静约 15 秒后自动收起胶囊（下次有事件会再出现）。
-  OpenCode/DevEco Code 靠 plugin 的 `session.deleted` 事件上报关闭，未触发时走超时收起。
-- OpenCode/DevEco Code 的 `tool.execute.before` 不一定带 sessionId，plugin 用「最近会话 id」
-  兜底，单会话场景表现正常；同时开多个会话时工具事件可能并入最近那个会话。
-- 仅在 Windows 11 上做过完整验证，macOS / Linux 的透明窗口表现可能有差异。
-- 安装包通过 `npm run dist` + Inno Setup 生成（见 [installer/README.md](installer/README.md)）。
+- **Electron 30** + **React 18** + **TypeScript** + **Vite**
+- **Framer Motion** 动画
+- **Inno Setup** 打包安装包
+- 零运行时第三方依赖（主进程仅用 Node 内置模块）
 
 ## 致谢
 
-基于 [chai1220/light](https://github.com/chai1220/light)（MIT）扩展。
-OpenCode 接入参考 [OpenCode Plugins 文档](https://opencode.ai/docs/plugins)。
-DevEco Code 信息参考华为 HDC 2026 发布的 `@deveco/deveco-code`。
+基于 [chai1220/light](https://github.com/chai1220/light)（MIT）二次开发。
+
+OpenCode 接入参考 [OpenCode Plugins 文档](https://opencode.ai/docs/plugins)。DevEco Code 信息参考华为 HDC 2026 发布的 `@deveco/deveco-code`。
 
 ## 许可
 

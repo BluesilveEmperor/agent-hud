@@ -1,5 +1,5 @@
 ; ============================================================================
-;  Light — Inno Setup script
+;  AgentHUD — Inno Setup script
 ;  Builds a Windows installer from the staged app folder (release\Light).
 ;
 ;  Prerequisites:
@@ -8,11 +8,11 @@
 ;    2) Open this file in Inno Setup 6 and click "Compile" (or:
 ;       iscc installer\light.iss)
 ;
-;  Output:  ..\release\Light-Setup-1.1.0.exe   (per-user, no admin needed)
+;  Output:  ..\release\AgentHUD-Setup-2.0.0.exe   (per-user, no admin needed)
 ; ============================================================================
 
 #define MyAppName "AgentHUD"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "AgentHUD"
 #define MyAppExeName "Light.exe"
 

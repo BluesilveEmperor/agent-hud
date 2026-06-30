@@ -100,6 +100,10 @@ body,
      always show and over-long content truncates inside instead. */
   max-width: calc(100vw - 20px);
   border-radius: 999px;
+  /* The glass capsule itself is the drag handle — grab any empty edge (the
+     16px padding, the rounded ends) and drag the window. Interactive content
+     inside sets no-drag so clicks pass through normally. */
+  -webkit-app-region: drag;
   --halo: transparent;
   --ring: transparent;
   background: linear-gradient(
@@ -481,6 +485,10 @@ body,
    ====================================================================== */
 .panel {
   pointer-events: auto;
+  /* Panel is not a drag handle — it's full of buttons, inputs, and
+     clickable rows that need to work normally. Only the island pill
+     above acts as the drag region. */
+  -webkit-app-region: no-drag;
   width: 384px;
   max-height: 78vh;
   overflow-y: auto;
@@ -679,6 +687,8 @@ body,
 }
 .minimal-inner {
   gap: 8px;
+  /* Same as island-row: content is interactive, rim is drag handle. */
+  -webkit-app-region: no-drag;
 }
 .minimal-inner .dot {
   width: 7px;
@@ -868,6 +878,9 @@ body,
   gap: 12px;
   width: 100%;
   min-width: 0;
+  /* Content area stays interactive — clicks open/close the panel, buttons
+     work normally. Only the glass rim (island padding) is the drag handle. */
+  -webkit-app-region: no-drag;
 }
 .vsep {
   width: 1px;
@@ -1290,4 +1303,218 @@ body,
   font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
   font-size: 10px;
   opacity: 0.6;
+}
+
+/* ======================================================================
+   LIGHT MODE
+   The dark theme is the default (above). Light mode is an opt-in override:
+   we flip the CSS variables and re-skin the glass surfaces so the capsule
+   reads well on a light wallpaper. Everything below is scoped to
+   `html.light`, which the main process toggles based on the user's choice
+   (or the OS theme, in "auto" mode).
+   ====================================================================== */
+html.light {
+  color-scheme: light;
+
+  --text: rgba(20, 22, 28, 0.92);
+  --text-dim: rgba(60, 64, 74, 0.62);
+  --hairline: rgba(0, 0, 0, 0.1);
+
+  /* State accents stay readable on a light surface — slightly deeper so they
+     don't wash out against white. */
+  --c-idle: #6b7280;
+  --c-working: #2f7fe0;
+  --c-working-2: #4aa8f5;
+  --c-done: #16a37a;
+  --c-error: #e23b3b;
+  --c-music: #d8458a;
+}
+
+/* ---- pill text: the dark-mode chip colours are near-white, which vanishes
+   on the frosted-white capsule. Override to dark, legible text. The state
+   accent (working blue / done green / error red) is carried by the .dot, so
+   the chip itself stays a neutral dark grey — the dot is the "light". */
+html.light .state-chip {
+  color: rgba(30, 34, 44, 0.78);
+}
+html.light .state-chip.working {
+  color: rgba(20, 24, 32, 0.92);
+}
+html.light .state-chip.idle {
+  color: rgba(80, 86, 98, 0.7);
+}
+html.light .state-chip.done {
+  color: rgba(22, 163, 122, 0.9);
+}
+html.light .state-chip.error {
+  color: rgba(200, 50, 50, 0.92);
+}
+/* The tool · time detail inside the chip was tuned for dark; lift opacity so
+   it reads on white. */
+html.light .chip-time,
+html.light .chip-eta {
+  opacity: 0.8;
+}
+html.light .chip-sep {
+  opacity: 0.35;
+}
+/* Agent label ("Claude") — was near-white via opacity; force it dark. */
+html.light .label {
+  color: rgba(18, 22, 30, 0.95);
+  opacity: 1;
+}
+/* Badges & tags had white-tint backgrounds; flip to dark tint. */
+html.light .count-badge {
+  background: rgba(15, 23, 42, 0.08);
+  color: rgba(30, 34, 44, 0.8);
+}
+html.light .session-tag {
+  background: rgba(15, 23, 42, 0.06);
+  color: rgba(60, 64, 74, 0.8);
+}
+/* The panel-row status line (.sub) already uses var(--text-dim) which adapts,
+   but bump its opacity a touch on light so "工作中 · Bash" doesn't look
+   washed out next to the bold agent name. */
+html.light .panel-row .sub {
+  opacity: 0.85;
+}
+
+/* The glass capsule: swap the dark base for a frosted-white base. The
+   gradient highlights flip from "light catching a dark glass" to "shadow
+   giving a white glass depth". */
+html.light .island {
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.72) 38%,
+      rgba(248, 249, 252, 0.6) 100%
+    ),
+    rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(28px) saturate(180%) brightness(1.02);
+  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.02);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06),
+    0 14px 34px rgba(15, 23, 42, 0.16),
+    0 3px 9px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.9),
+    inset 0 -10px 18px -12px rgba(15, 23, 42, 0.08),
+    0 0 26px -4px var(--halo);
+  text-shadow: 0 0.5px 0.5px rgba(255, 255, 255, 0.5);
+}
+html.light .island:hover {
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 20px 46px rgba(15, 23, 42, 0.2),
+    0 5px 13px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0.5px rgba(255, 255, 255, 1),
+    inset 0 -10px 18px -12px rgba(15, 23, 42, 0.1),
+    0 0 30px -3px var(--halo);
+}
+
+/* The drop-down panel: same frosted-white treatment. */
+html.light .panel {
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.82) 30%,
+      rgba(248, 249, 252, 0.7) 100%
+    ),
+    rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(34px) saturate(180%) brightness(1.02);
+  -webkit-backdrop-filter: blur(34px) saturate(180%) brightness(1.02);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06),
+    0 28px 60px rgba(15, 23, 42, 0.22),
+    0 8px 20px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.9),
+    inset 0 -18px 32px -22px rgba(15, 23, 42, 0.08);
+  text-shadow: 0 0.5px 0.5px rgba(255, 255, 255, 0.4);
+}
+
+/* Cards inside the panel: light grey tint instead of dark inset. */
+html.light .card {
+  background: rgba(15, 23, 42, 0.04);
+  border: 0.5px solid rgba(0, 0, 0, 0.07);
+}
+html.light .panel-row:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+/* Context / usage bars: the track was white-on-dark; flip to dark-on-light. */
+html.light .ctx-mini-track,
+html.light .usage-bar,
+html.light .stats-bar {
+  background: rgba(15, 23, 42, 0.1);
+}
+html.light .usage-pct,
+html.light .stats-tool-chip {
+  background: rgba(15, 23, 42, 0.07);
+  color: var(--text-dim);
+}
+
+/* Form inputs. */
+html.light .notify-url,
+html.light .memo-input input {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: var(--text);
+}
+html.light .notify-url:focus {
+  border-color: rgba(47, 127, 224, 0.5);
+}
+
+/* Hook / history detail rows: the inset backgrounds were tuned for dark; lift
+   them so borders read on white. */
+html.light .hist-row-wrap {
+  border-color: rgba(0, 0, 0, 0.07);
+}
+html.light .hist-row:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+html.light .stats-agent {
+  border-color: rgba(0, 0, 0, 0.07);
+}
+html.light .stats-bar-fill {
+  background: var(--c-working);
+}
+
+/* The memo card's completed state dims more aggressively on light (the
+   strikethrough reads better against the brighter surface). */
+html.light .memo.completed {
+  opacity: 0.5;
+}
+
+/* Section heads and meta text already use var(--text-dim), so they adapt
+   automatically. One spot that hardcoded white needs an override: */
+html.light .panel-name {
+  color: var(--text);
+}
+
+/* Theme switcher row inside the panel. */
+.theme-row {
+  display: flex;
+  gap: 6px;
+  padding: 2px 4px;
+}
+.theme-btn {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--hairline);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.theme-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+html.light .theme-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+.theme-btn.active {
+  background: var(--c-working);
+  color: #fff;
+  border-color: transparent;
 }

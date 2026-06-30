@@ -145,12 +145,10 @@ export function Island({ sessions, memos, system }: Props) {
       <motion.div
         ref={islandRef}
         className={`island s-${status} ${isMinimal ? "minimal" : ""} ${open ? "open" : ""}`}
-        onClick={handleClick}
         onMouseEnter={handleEnter}
         onMouseLeave={handleLeave}
         layout
         whileHover={{ y: -2 }}
-        whileTap={{ scale: 0.985 }}
         transition={{ type: "spring", stiffness: 300, damping: 26 }}
       >
         <span className="aurora" aria-hidden="true" />
@@ -164,6 +162,7 @@ export function Island({ sessions, memos, system }: Props) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              onClick={handleClick}
             >
               <span className="dot idle" />
               <span className="sub" style={{ opacity: hover || open ? 0.7 : 0 }}>
@@ -178,6 +177,7 @@ export function Island({ sessions, memos, system }: Props) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              onClick={handleClick}
             >
               <div className="agents">
                 {agents.map((a) => (
