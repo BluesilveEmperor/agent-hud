@@ -1,0 +1,9 @@
+# Binaries
+*.exe
+*.dll
+*.pak
+*.dat
+*.bin
+
+# Uninstaller
+unins000.*
