@@ -1,0 +1,86 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact: AgentHUD-Setup-*.exe
+          - os: macos-latest
+            platform: mac
+            artifact: AgentHUD-*.dmg
+          - os: ubuntu-22.04
+            platform: linux
+            artifact: AgentHUD-*-linux-*.tar.gz
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Stage (cross-platform)
+        run: node scripts/stage.mjs
+
+      # Platform-specific packaging
+      - name: Package Windows (Inno Setup)
+        if: matrix.platform == 'win'
+        run: |
+          choco install innosetup -y --no-progress
+          iscc installer/light.iss
+
+      - name: Package macOS (DMG)
+        if: matrix.platform == 'mac'
+        run: node scripts/pack-dmg.mjs
+
+      - name: Package Linux (tarball)
+        if: matrix.platform == 'linux'
+        run: node scripts/pack-tarball.mjs
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgentHUD-${{ matrix.platform }}
+          path: release/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/win/*
+            artifacts/mac/*
+            artifacts/linux/*

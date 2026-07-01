@@ -73,14 +73,73 @@ npm run dev
 
 ### 打包安装包
 
-```bash
-# 构建并 stage 到 release/Light/
-npm run dist
+项目支持 **Windows / macOS / Linux** 三平台。Electron 本身跨平台，代码已做平台适配（Windows 媒体控制在 Mac/Linux 自动禁用，窗口属性按平台调整）。
 
-# 用 Inno Setup 编译安装包（需安装 Inno Setup 6）
+#### Windows（需要 Inno Setup）
+
+```bash
+npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
 # → release/AgentHUD-Setup-2.0.0.exe
 ```
+
+#### macOS
+
+```bash
+npm run dist:mac      # build + stage + pack-dmg
+# → release/AgentHUD-2.0.0.dmg
+```
+
+`pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
+
+#### Linux (Ubuntu / Debian)
+
+```bash
+npm run dist:linux    # build + stage + pack-tarball
+# → release/AgentHUD-2.0.0-linux-x64.tar.gz
+```
+
+解压后运行：
+```bash
+tar xzf AgentHUD-2.0.0-linux-x64.tar.gz
+./AgentHUD/run.sh
+```
+
+> Linux 上透明窗口的表现取决于桌面环境（GNOME/KDE/X11/Wayland）。Wayland 下透明可能不生效，建议在 X11 会话中运行。
+
+#### 用 electron-builder 统一打包（可选）
+
+项目也配置了 electron-builder，可以在对应平台上生成标准安装包：
+
+```bash
+npm install
+npx electron-builder --win    # Windows: NSIS 安装包
+npx electron-builder --mac    # macOS: DMG
+npx electron-builder --linux  # Linux: AppImage + deb
+```
+
+#### CI 自动构建（GitHub Actions）
+
+仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
+
+```bash
+git tag v2.0.0
+git push origin v2.0.0
+# → Actions 页面查看构建进度，完成后 Release 页面下载安装包
+```
+
+### 平台差异说明
+
+| 功能 | Windows | macOS | Linux |
+|------|---------|-------|-------|
+| 状态胶囊 + 拖动 | 完整支持 | 完整支持 | 完整支持 |
+| Token 用量 / 上下文 | 完整支持 | 完整支持 | 完整支持 |
+| 完成通知（系统通知） | Toast | Notification Center | libnotify |
+| Webhook 通知 | 完整支持 | 完整支持 | 完整支持 |
+| 会话历史 / 统计 | 完整支持 | 完整支持 | 完整支持 |
+| 主题切换 | 完整支持 | 完整支持 | 完整支持 |
+| 媒体控制（播放/暂停等） | SMTC 支持 | 暂不支持 | 暂不支持 |
+| 一键接入 hooks | 完整支持 | 完整支持 | 完整支持 |
 
 ## 接入 Agent
 

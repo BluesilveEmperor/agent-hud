@@ -37,3 +37,6 @@ desktop.ini
 
 # Local notification-debug helpers — not part of the product
 bridge/diag*.ps1
+
+# electron-builder output (separate from our hand-staged release/)
+release/electron-builder/

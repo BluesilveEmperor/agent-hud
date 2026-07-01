@@ -66,7 +66,13 @@ async function main() {
   const env = {
     ...process.env,
     VITE_DEV_SERVER_URL: `http://127.0.0.1:${VITE_PORT}`,
-    ELECTRON_CACHE: process.env.ELECTRON_CACHE || `${process.env.LOCALAPPDATA}\\electron\\Cache`,
+    ELECTRON_CACHE: process.env.ELECTRON_CACHE || (
+      process.platform === "win32"
+        ? `${process.env.LOCALAPPDATA}\\electron\\Cache`
+        : process.platform === "darwin"
+          ? `${process.env.HOME}/Library/Caches/electron`
+          : `${process.env.HOME}/.cache/electron`
+    ),
   };
   const electron = run("npx", ["electron", "."], { env });
 

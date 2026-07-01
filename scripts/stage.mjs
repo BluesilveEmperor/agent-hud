@@ -1,23 +1,13 @@
-// Assemble a self-contained, runnable Light app folder under release/Light/.
+// Cross-platform stage script: assemble a self-contained, runnable app folder.
 //
-// We DON'T use electron-builder/electron-packager — instead we reuse the
-// Electron binary already cached in node_modules (no extra download) and lay
-// the app out by hand. This works because Light's main process only uses Node
-// built-ins + electron (zero third-party runtime deps), and the renderer is
-// fully bundled by Vite — so resources/app needs no node_modules at all.
+// Works on Windows / macOS / Linux. Detects the host platform and lays out
+// the Electron app accordingly:
+//   - Windows: release/AgentHUD/AgentHUD.exe + *.dll + resources/
+//   - macOS:   release/AgentHUD.app/Contents/MacOS/AgentHUD + ...
+//   - Linux:   release/AgentHUD/agenthud + *.so + resources/
 //
-// Output tree (what Inno Setup then packages into the installer):
-//   release/Light/
-//     Light.exe              (renamed electron.exe)
-//     *.dll, *.pak, *.bin, icudtl.dat, locales/, resources/   (electron runtime)
-//     resources/app/
-//       package.json         (trimmed, main -> dist-electron/main.js)
-//       dist/                (renderer build)
-//       dist-electron/       (compiled main + preload)
-//       bridge/              (SMTC / notification PowerShell helpers)
-//       icon.ico             (tray + window icon)
-//     hooks/                 (Claude Code / Codex integration scripts)
-//     light.ico
+// The app payload (dist/ + dist-electron/ + hooks/ + bridge/) is identical
+// across platforms — only the Electron runtime wrapper differs.
 //
 // Run AFTER `npm run build`.  npm run dist == build + stage.
 
@@ -26,8 +16,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const out = path.join(root, "release", "Light");
-const appDir = path.join(out, "resources", "app");
+const platform = process.platform; // win32 | darwin | linux
+
+const APP_NAME = "AgentHUD";
+const EXEC_NAME = platform === "win32" ? "AgentHUD.exe" : "agenthud";
+
+// Output dir differs per platform: macOS gets a .app bundle, others get a flat dir.
+const outDir = platform === "darwin"
+  ? path.join(root, "release", `${APP_NAME}.app`)
+  : path.join(root, "release", APP_NAME);
+const appDir = platform === "darwin"
+  ? path.join(outDir, "Contents", "Resources", "app")
+  : path.join(outDir, "resources", "app");
 
 const log = (m) => process.stdout.write(`[stage] ${m}\n`);
 const die = (m) => {
@@ -35,68 +35,123 @@ const die = (m) => {
   process.exit(1);
 };
 
-function rmrf(p) {
-  fs.rmSync(p, { recursive: true, force: true });
+function rmrf(p) { fs.rmSync(p, { recursive: true, force: true }); }
+function copyDir(src, dest) { fs.cpSync(src, dest, { recursive: true }); }
+
+// ---- resolve electron binary location per platform ------------------------
+const electronDist = path.join(root, "node_modules", "electron", "dist");
+function electronBinaryName() {
+  if (platform === "win32") return "electron.exe";
+  if (platform === "darwin") return "Electron"; // inside Electron.app/Contents/MacOS/
+  return "electron";
 }
-function copyDir(src, dest) {
-  fs.cpSync(src, dest, { recursive: true });
-}
+const electronBin = path.join(electronDist, electronBinaryName());
+
+// ---- resolve icon ---------------------------------------------------------
+// .ico on Windows, .png/.icns on Mac, .png on Linux. We ship .ico; on Mac/Linux
+// we fall back to it (Electron accepts .ico cross-platform for the tray; the
+// window icon is less critical on Mac where the dock uses the .app icon).
+const iconSrc = path.join(root, "installer", "light.ico");
 
 // ---- preconditions --------------------------------------------------------
 const distRenderer = path.join(root, "dist");
 const distElectron = path.join(root, "dist-electron");
-const electronDist = path.join(root, "node_modules", "electron", "dist");
-const iconSrc = path.join(root, "installer", "light.ico");
 
 if (!fs.existsSync(path.join(distRenderer, "index.html")))
   die("dist/index.html missing — run `npm run build` first.");
 if (!fs.existsSync(path.join(distElectron, "main.js")))
   die("dist-electron/main.js missing — run `npm run build` first.");
-if (!fs.existsSync(path.join(electronDist, "electron.exe")))
-  die("node_modules/electron/dist/electron.exe missing — run `npm install`.");
-if (!fs.existsSync(iconSrc)) die("installer/light.ico missing.");
+if (!fs.existsSync(electronBin))
+  die(`Electron binary not found at ${electronBin} — run \`npm install\`.`);
 
 // ---- clean ----------------------------------------------------------------
-log("cleaning release/Light …");
-rmrf(out);
+log(`cleaning ${path.relative(root, outDir)} …`);
+rmrf(outDir);
 fs.mkdirSync(appDir, { recursive: true });
 
 // ---- electron runtime -----------------------------------------------------
 log("copying Electron runtime …");
-copyDir(electronDist, out);
-
-// Rename the launcher and drop Electron's bundled demo app.
-fs.renameSync(path.join(out, "electron.exe"), path.join(out, "Light.exe"));
-rmrf(path.join(out, "resources", "default_app.asar"));
+if (platform === "darwin") {
+  // On macOS, node_modules/electron/dist/ is an Electron.app bundle.
+  // Copy the whole .app, then rename the inner executable.
+  copyDir(electronDist, outDir);
+  const macOSDir = path.join(outDir, "Contents", "MacOS");
+  const oldBin = path.join(macOSDir, "Electron");
+  const newBin = path.join(macOSDir, EXEC_NAME);
+  if (fs.existsSync(oldBin)) fs.renameSync(oldBin, newBin);
+  // Drop the bundled demo app.
+  rmrf(path.join(outDir, "Contents", "Resources", "default_app.asar"));
+  // Fix Info.plist: set CFBundleName so the dock/menubar shows "AgentHUD".
+  const plistPath = path.join(outDir, "Contents", "Info.plist");
+  if (fs.existsSync(plistPath)) {
+    let plist = fs.readFileSync(plistPath, "utf8");
+    plist = plist.replace(/<key>CFBundleName<\/key>\s*<string>[^<]*<\/string>/,
+      `<key>CFBundleName</key><string>${APP_NAME}</string>`);
+    plist = plist.replace(/<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/,
+      `<key>CFBundleDisplayName</key><string>${APP_NAME}</string>`);
+    fs.writeFileSync(plistPath, plist, "utf8");
+  }
+} else {
+  // Windows / Linux: flat directory layout.
+  copyDir(electronDist, outDir);
+  const oldBin = path.join(outDir, electronBinaryName());
+  const newBin = path.join(outDir, EXEC_NAME);
+  if (fs.existsSync(oldBin)) fs.renameSync(oldBin, newBin);
+  rmrf(path.join(outDir, "resources", "default_app.asar"));
+}
 
 // ---- app payload ----------------------------------------------------------
 log("copying app payload …");
 copyDir(distRenderer, path.join(appDir, "dist"));
 copyDir(distElectron, path.join(appDir, "dist-electron"));
-copyDir(path.join(root, "bridge"), path.join(appDir, "bridge"));
-fs.copyFileSync(iconSrc, path.join(appDir, "icon.ico"));
+// bridge/ contains Windows-only PowerShell scripts; copy it anyway (harmless
+// on other platforms, and the code guards on process.platform before running).
+if (fs.existsSync(path.join(root, "bridge"))) {
+  copyDir(path.join(root, "bridge"), path.join(appDir, "bridge"));
+}
+if (fs.existsSync(iconSrc)) {
+  fs.copyFileSync(iconSrc, path.join(appDir, "icon.ico"));
+}
 
-// Trimmed production package.json (no devDeps, no scripts).
+// Trimmed production package.json.
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const appPkg = {
   name: pkg.name,
-  productName: "Light",
+  productName: APP_NAME,
   version: pkg.version,
   description: pkg.description,
   main: "dist-electron/main.js",
-  author: pkg.author || "Light",
+  author: pkg.author || APP_NAME,
   license: pkg.license || "MIT",
 };
-fs.writeFileSync(
-  path.join(appDir, "package.json"),
-  JSON.stringify(appPkg, null, 2),
-  "utf8",
-);
+fs.writeFileSync(path.join(appDir, "package.json"), JSON.stringify(appPkg, null, 2), "utf8");
 
 // ---- integration scripts + icon at install root ---------------------------
 log("copying hooks + icon …");
-copyDir(path.join(root, "hooks"), path.join(out, "hooks"));
-fs.copyFileSync(iconSrc, path.join(out, "light.ico"));
+const hooksOut = platform === "darwin"
+  ? path.join(outDir, "Contents", "Resources", "hooks")
+  : path.join(outDir, "hooks");
+copyDir(path.join(root, "hooks"), hooksOut);
+if (fs.existsSync(iconSrc)) {
+  const iconOut = platform === "darwin"
+    ? path.join(outDir, "Contents", "Resources", "light.ico")
+    : path.join(outDir, "light.ico");
+  fs.copyFileSync(iconSrc, iconOut);
+}
+
+// ---- Linux: make executable + create .desktop entry -----------------------
+if (platform === "linux") {
+  try { fs.chmodSync(path.join(outDir, EXEC_NAME), 0o755); } catch {}
+  const desktop = `[Desktop Entry]
+Type=Application
+Name=AgentHUD
+Comment=桌面状态胶囊
+Exec=${path.join(outDir, EXEC_NAME)}
+Icon=${path.join(outDir, "light.ico")}
+Terminal=false
+Categories=Utility;`;
+  fs.writeFileSync(path.join(outDir, "agenthud.desktop"), desktop, "utf8");
+}
 
 // ---- done -----------------------------------------------------------------
 function dirSize(p) {
@@ -107,6 +162,12 @@ function dirSize(p) {
   }
   return total;
 }
-const mb = (dirSize(out) / 1024 / 1024).toFixed(1);
-log(`done → ${path.relative(root, out)}  (${mb} MB)`);
-log("next: open installer/light.iss in Inno Setup and Compile.");
+const mb = (dirSize(outDir) / 1024 / 1024).toFixed(1);
+log(`done → ${path.relative(root, outDir)}  (${mb} MB)`);
+if (platform === "win32") {
+  log("next: iscc installer/light.iss  (Inno Setup)");
+} else if (platform === "darwin") {
+  log("next: hdiutil create -volname AgentHUD -srcfolder release/AgentHUD.app -ov -format UDZO release/AgentHUD.dmg");
+} else {
+  log("next: tar czf release/AgentHUD-linux.tar.gz -C release AgentHUD  (or use AppImage)");
+}

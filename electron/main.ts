@@ -62,6 +62,7 @@ function resolveIcon(): string | undefined {
 function createWindow(): void {
   const display = screen.getPrimaryDisplay();
   const { width: screenW } = display.workAreaSize;
+  const plat = process.platform;
 
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
@@ -79,6 +80,10 @@ function createWindow(): void {
     show: false,
     icon: resolveIcon(),
     backgroundColor: "#00000000",
+    // Linux compositors can be finicky with transparent frameless windows.
+    // These hints help them place it as an overlay/popup rather than a normal
+    // tiled window. macOS and Windows ignore the `type` hint.
+    ...(plat === "linux" ? { type: "notification" as const } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
