@@ -25,7 +25,7 @@ const EXEC_NAME = platform === "win32" ? "AgentHUD.exe" : "agenthud";
 const outDir = platform === "darwin"
   ? path.join(root, "release", `${APP_NAME}.app`)
   : path.join(root, "release", APP_NAME);
-const appDir = platform === "darwin"
+let appDir = platform === "darwin"
   ? path.join(outDir, "Contents", "Resources", "app")
   : path.join(outDir, "resources", "app");
 
@@ -72,17 +72,28 @@ fs.mkdirSync(appDir, { recursive: true });
 // ---- electron runtime -----------------------------------------------------
 log("copying Electron runtime …");
 if (platform === "darwin") {
-  // On macOS, node_modules/electron/dist/ is an Electron.app bundle.
-  // Copy the whole .app, then rename the inner executable.
-  copyDir(electronDist, outDir);
-  const macOSDir = path.join(outDir, "Contents", "MacOS");
+  // On macOS, node_modules/electron/dist/ contains Electron.app (a bundle).
+  // We copy its Contents/ directly into our output .app skeleton so the
+  // resulting structure is a valid .app:
+  //
+  //   release/AgentHUD.app/
+  //     Contents/
+  //       Info.plist
+  //       MacOS/AgentHUD   (renamed Electron)
+  //       Resources/app/   (our payload)
+  //       ...
+  const appBundle = path.join(electronDist, "Electron.app", "Contents");
+  const bundleContents = path.join(outDir, "Contents");
+  copyDir(appBundle, bundleContents);
+  // Rename the inner executable.
+  const macOSDir = path.join(bundleContents, "MacOS");
   const oldBin = path.join(macOSDir, "Electron");
   const newBin = path.join(macOSDir, EXEC_NAME);
   if (fs.existsSync(oldBin)) fs.renameSync(oldBin, newBin);
   // Drop the bundled demo app.
-  rmrf(path.join(outDir, "Contents", "Resources", "default_app.asar"));
-  // Fix Info.plist: set CFBundleName so the dock/menubar shows "AgentHUD".
-  const plistPath = path.join(outDir, "Contents", "Info.plist");
+  rmrf(path.join(bundleContents, "Resources", "default_app.asar"));
+  // Fix Info.plist so the dock/menubar shows "AgentHUD".
+  const plistPath = path.join(bundleContents, "Info.plist");
   if (fs.existsSync(plistPath)) {
     let plist = fs.readFileSync(plistPath, "utf8");
     plist = plist.replace(/<key>CFBundleName<\/key>\s*<string>[^<]*<\/string>/,
@@ -91,6 +102,8 @@ if (platform === "darwin") {
       `<key>CFBundleDisplayName</key><string>${APP_NAME}</string>`);
     fs.writeFileSync(plistPath, plist, "utf8");
   }
+  // Update appDir: on macOS the payload goes into Contents/Resources/app/
+  appDir = path.join(bundleContents, "Resources", "app");
 } else {
   // Windows / Linux: flat directory layout.
   copyDir(electronDist, outDir);
