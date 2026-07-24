@@ -45,7 +45,11 @@ function electronBinaryName() {
   if (platform === "darwin") return "Electron"; // inside Electron.app/Contents/MacOS/
   return "electron";
 }
-const electronBin = path.join(electronDist, electronBinaryName());
+// On macOS the binary lives inside Electron.app/Contents/MacOS/Electron,
+// not at dist/Electron directly.
+const electronBin = platform === "darwin"
+  ? path.join(electronDist, "Electron.app", "Contents", "MacOS", "Electron")
+  : path.join(electronDist, electronBinaryName());
 
 // ---- resolve icon ---------------------------------------------------------
 // .ico on Windows, .png/.icns on Mac, .png on Linux. We ship .ico; on Mac/Linux
