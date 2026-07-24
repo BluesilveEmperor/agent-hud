@@ -1,0 +1,1766 @@
+:root {
+  color-scheme: dark;
+
+  /* ---- accent system ---------------------------------------------------
+     One source of truth for the four states. The capsule, dots, chips and
+     aurora all read from these so a colour tweak stays consistent.
+     Macaron palette — soft, milky, desaturated tones inspired by French
+     macarons: lavender grey, powder blue, pistachio, strawberry, rose. */
+  --c-idle: #b5b8c4;
+  --c-working: #7fc8dc;
+  --c-working-2: #a0d9e5; /* cyan partner for the working aurora gradient */
+  --c-done: #8fe3b5;
+  --c-error: #f5a89f;
+  --c-music: #f5a8c9;
+
+  --text: rgba(255, 255, 255, 0.96);
+  --text-dim: rgba(232, 236, 244, 0.62);
+  --hairline: rgba(255, 255, 255, 0.09);
+}
+
+/* Typed custom props so the capsule's halo + accent can be *animated*
+   smoothly between states instead of snapping. */
+@property --halo {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+@property --ring {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+/* Animated angle for the dual-edge flow light (HarmonyOS 7 style).
+   Two comet trails — cyan & pink — rotate around the capsule border. */
+@property --flow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", Roboto, "Helvetica Neue", sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  cursor: default;
+}
+
+/* Allow selecting & copying the text content (memos, notifications, events). */
+.memo-text,
+.notif-title,
+.notif-body,
+.notif-row-title,
+.notif-row-body,
+.evt-text,
+.media-title,
+.media-artist {
+  user-select: text;
+  cursor: text;
+}
+
+#root {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 10px;
+}
+
+.stage {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+/* ======================================================================
+   ISLAND — the capsule
+   A dark, consistent scrim guarantees white text stays legible on ANY
+   wallpaper (bright or dark); the backdrop blur+saturate layered on top is
+   what sells the "frosted glass" refraction. We lean on the scrim rather
+   than brightness() tricks, which used to muddy bright desktops into a
+   flat purple slab.
+   ====================================================================== */
+.island {
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 38px;
+  /* Never grow past the window, or the capsule gets clipped flat at the
+     screen edges (the "hard boundary" look). Capped here, the rounded ends
+     always show and over-long content truncates inside instead. */
+  max-width: calc(100vw - 20px);
+  border-radius: 999px;
+  /* The glass capsule itself is the drag handle — grab any empty edge (the
+     16px padding, the rounded ends) and drag the window. Interactive content
+     inside sets no-drag so clicks pass through normally. */
+  -webkit-app-region: drag;
+  --halo: transparent;
+  --ring: transparent;
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.04) 30%,
+      rgba(255, 255, 255, 0) 62%
+    ),
+    rgba(17, 19, 25, 0.5);
+  backdrop-filter: blur(26px) saturate(165%) brightness(0.92);
+  -webkit-backdrop-filter: blur(26px) saturate(165%) brightness(0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* Layered edge: thin dark outer ring keeps the rim visible on a white
+     wallpaper; inset top highlight catches light like a bevelled edge; inset
+     bottom shade gives the glass thickness; the last shadow is the animated
+     state halo (transparent at rest). */
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.2),
+    0 14px 34px rgba(0, 0, 0, 0.34),
+    0 3px 9px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
+    inset 0 -10px 18px -12px rgba(0, 0, 0, 0.4),
+    0 0 26px -4px var(--halo);
+  text-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  overflow: hidden;
+  /* NEVER transition `transform` here — Framer drives transform for the
+     layout + hover animations; a CSS transition on it causes the janky fight
+     that made the pill feel laggy. Animate colour/shadow only. */
+  transition: box-shadow 0.35s ease, --halo 0.45s ease, --ring 0.45s ease;
+  will-change: transform;
+}
+
+/* Per-state accent. The capsule itself gains a faint coloured halo + ring,
+   so the WHOLE island reacts to state, not just the dot — reads beautifully
+   in motion. */
+.island.s-working {
+  --halo: rgba(127, 200, 220, 0.5);
+  --ring: rgba(160, 217, 229, 0.5);
+}
+.island.s-done {
+  --halo: rgba(143, 227, 181, 0.42);
+  --ring: rgba(180, 240, 200, 0.5);
+}
+.island.s-error {
+  --halo: rgba(245, 168, 159, 0.46);
+  --ring: rgba(250, 190, 183, 0.55);
+}
+
+.island:hover {
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.22),
+    0 20px 46px rgba(0, 0, 0, 0.44),
+    0 5px 13px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.5),
+    inset 0 -10px 18px -12px rgba(0, 0, 0, 0.42),
+    0 0 30px -3px var(--halo);
+}
+
+/* ---- aurora: the live "working" layer -------------------------------
+   Holds the accent ring + the travelling specular sweep. Clipped to the
+   pill by the island's overflow:hidden. Hidden (opacity 0) at rest; fades in
+   when the island carries a state. */
+.aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  box-shadow: inset 0 0 0 1px var(--ring),
+    inset 0 0 14px -3px var(--ring);
+}
+.island.s-working .aurora,
+.island.s-done .aurora,
+.island.s-error .aurora {
+  opacity: 1;
+}
+
+/* Travelling glass sheen — a soft diagonal highlight that sweeps across the
+   capsule then rests, signalling "alive / working". Pure transform = the
+   compositor handles it, so it stays smooth even with the backdrop blur. */
+.aurora::before {
+  content: "";
+  position: absolute;
+  top: -60%;
+  height: 220%;
+  width: 26%;
+  left: 0;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.16) 45%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent
+  );
+  transform: translateX(-200%) skewX(-14deg);
+  opacity: 0;
+}
+.island.s-working .aurora::before {
+  animation: sheen 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes sheen {
+  0% {
+    transform: translateX(-200%) skewX(-14deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 1;
+  }
+  52%,
+  100% {
+    transform: translateX(560%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+/* Done flash: the ring gives a single gentle bloom when a task finishes. */
+.island.s-done .aurora {
+  animation: doneBloom 0.7s ease-out;
+}
+@keyframes doneBloom {
+  0% {
+    box-shadow: inset 0 0 0 1px var(--ring), inset 0 0 0 0 var(--ring);
+  }
+  40% {
+    box-shadow: inset 0 0 0 1.5px var(--ring), inset 0 0 22px 0 var(--ring);
+  }
+}
+
+/* Static diagonal specular streak baked into the glass (present always). */
+.glass-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.04) 18%,
+    rgba(255, 255, 255, 0) 44%
+  );
+  opacity: 0.85;
+}
+.island > *:not(.glass-sheen):not(.aurora),
+.panel > *:not(.glass-sheen) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ======================================================================
+   DUAL-EDGE FLOW LIGHT — HarmonyOS 7 style (official spec)
+   Two independent edge flow lights per HarmonyOS UI Design Kit:
+     firstEdge:  startPos 0,   endPos 1.0, color #1AD0F1 (cyan)
+     secondEdge: startPos 0.5, endPos 1.5, color #FFA4E5 (pink)
+   A conic-gradient holds the two trails on opposite sides (180° offset);
+   a mask ring (content-box minus padding) confines the gradient to a
+   border ring; @property --flow-angle drives a smooth GPU rotation.
+   Animation duration 4000ms per official spec.
+
+   The flow light uses the official vivid colors — distinct from the
+   macaron status-dot palette — because it is a decorative glow effect
+   that needs to read clearly against any wallpaper.
+   ====================================================================== */
+.island::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--flow-angle),
+    transparent 0%,
+    rgba(26, 208, 241, 0) 2%,
+    rgba(26, 208, 241, 0.95) 7%,
+    rgba(26, 208, 241, 0.35) 14%,
+    rgba(26, 208, 241, 0) 22%,
+    transparent 44%,
+    rgba(255, 164, 229, 0) 48%,
+    rgba(255, 164, 229, 0.95) 57%,
+    rgba(255, 164, 229, 0.35) 64%,
+    rgba(255, 164, 229, 0) 72%,
+    transparent 100%
+  );
+  /* Ring mask: fill everything, then cut out the content-box, leaving only
+     the padding ring visible.  -webkit- prefix for Chromium. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  padding: 4px;
+  animation: flow-rotate 4s linear infinite;
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 0.4s ease;
+}
+/* Brighten the flow during active states. */
+.island.s-working::after {
+  opacity: 1;
+}
+.island.s-done::after,
+.island.s-error::after {
+  opacity: 0.85;
+}
+
+@keyframes flow-rotate {
+  to {
+    --flow-angle: 360deg;
+  }
+}
+
+.agents {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  /* Allow a pill to shrink so its prompt chip can ellipsize (flex children
+     won't shrink below content width without this). */
+  min-width: 0;
+}
+
+.agent + .agent::before {
+  content: "";
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  margin-right: 6px;
+}
+
+/* ---- dots: glossy little status beads -------------------------------- */
+.dot {
+  --dot: rgba(255, 255, 255, 0.45);
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: radial-gradient(
+      circle at 34% 28%,
+      rgba(255, 255, 255, 0.9),
+      rgba(255, 255, 255, 0) 42%
+    ),
+    var(--dot);
+  box-shadow: 0 0 0 0 transparent, inset 0 -1px 1.5px rgba(0, 0, 0, 0.25);
+  transition: background 0.25s, box-shadow 0.25s;
+}
+
+.dot.idle {
+  --dot: var(--c-idle);
+}
+.dot.working {
+  --dot: var(--c-working);
+  /* Point light: multi-layer radial glow emanating from the dot.
+     Layer 1: tight core glow; Layer 2: mid-range bloom; Layer 3: far diffuse.
+     This is the "source" — neighbors receive light via text-shadow. */
+  box-shadow: 0 0 6px 0 rgba(127, 200, 220, 0.65),
+    0 0 16px 3px rgba(127, 200, 220, 0.3),
+    0 0 30px 8px rgba(127, 200, 220, 0.08),
+    inset 0 -1px 1.5px rgba(0, 0, 0, 0.25);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.dot.done {
+  --dot: var(--c-done);
+  box-shadow: 0 0 7px 1px rgba(143, 227, 181, 0.65),
+    0 0 18px 4px rgba(143, 227, 181, 0.28),
+    0 0 32px 8px rgba(143, 227, 181, 0.08),
+    inset 0 -1px 1.5px rgba(0, 0, 0, 0.2);
+  animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dot.error {
+  --dot: var(--c-error);
+  box-shadow: 0 0 7px 1px rgba(245, 168, 159, 0.6),
+    0 0 18px 4px rgba(245, 168, 159, 0.25),
+    0 0 32px 8px rgba(245, 168, 159, 0.07),
+    inset 0 -1px 1.5px rgba(0, 0, 0, 0.2);
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px 0 rgba(127, 200, 220, 0.65),
+      0 0 16px 3px rgba(127, 200, 220, 0.3),
+      0 0 30px 8px rgba(127, 200, 220, 0.08),
+      inset 0 -1px 1.5px rgba(0, 0, 0, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 8px 1px rgba(127, 200, 220, 0.7),
+      0 0 22px 5px rgba(127, 200, 220, 0.35),
+      0 0 42px 12px rgba(127, 200, 220, 0.1),
+      inset 0 -1px 1.5px rgba(0, 0, 0, 0.25);
+  }
+}
+@keyframes popIn {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+/* ---- state chip (right side of each agent) ----
+   The colour signal lives on the front .dot only. The chip stays a neutral,
+   glow-free label so the dot reads as "the light". */
+.state-chip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 240px;
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  color: var(--text-dim);
+}
+.state-chip.working {
+  color: rgba(236, 242, 250, 0.9);
+  /* Illuminated by the dot's cyan point light */
+  text-shadow: 0 0 6px rgba(127, 200, 220, 0.2);
+}
+.state-chip.idle {
+  color: rgba(170, 178, 190, 0.66);
+}
+.state-chip .check {
+  stroke: var(--c-done);
+  fill: none;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Tool · time detail. Tabular figures keep the timer the same width as it
+   ticks, so the row never reflows when seconds change. */
+.chip-sep {
+  opacity: 0.4;
+  margin: 0 1px;
+}
+.chip-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+
+/* Agent label receives light from the dot — subtle state-tinted text glow
+   that matches the dot's color, so text feels "illuminated" by its dot. */
+.label {
+  font-weight: 600;
+  opacity: 0.97;
+  letter-spacing: 0.1px;
+  flex-shrink: 0;
+  transition: text-shadow 0.35s ease;
+}
+.agent.state-working .label {
+  text-shadow: 0 0 8px rgba(127, 200, 220, 0.35);
+}
+.agent.state-done .label {
+  text-shadow: 0 0 8px rgba(143, 227, 181, 0.3);
+}
+.agent.state-error .label {
+  text-shadow: 0 0 8px rgba(245, 168, 159, 0.3);
+}
+
+.sub {
+  opacity: 0.65;
+  font-size: 12px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-tag {
+  font-size: 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+/* ---- equalizer: animated "now playing" bars -------------------------- */
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--c-music);
+}
+.eq i {
+  width: 2.5px;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+  transform: scaleY(0.3);
+  transform-origin: bottom;
+}
+.eq.playing i {
+  animation: eq 1.1s ease-in-out infinite;
+}
+.eq i:nth-child(1) {
+  animation-delay: -0.9s;
+}
+.eq i:nth-child(2) {
+  animation-delay: -0.4s;
+}
+.eq i:nth-child(3) {
+  animation-delay: -0.65s;
+}
+.eq i:nth-child(4) {
+  animation-delay: -0.15s;
+}
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.28);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* ======================================================================
+   PANEL — the drop-down
+   ====================================================================== */
+.panel {
+  pointer-events: auto;
+  /* Panel is not a drag handle — it's full of buttons, inputs, and
+     clickable rows that need to work normally. Only the island pill
+     above acts as the drag region. */
+  -webkit-app-region: no-drag;
+  width: 384px;
+  max-height: 78vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 24px;
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.03) 18%,
+      rgba(255, 255, 255, 0) 42%
+    ),
+    rgba(16, 18, 24, 0.62);
+  backdrop-filter: blur(34px) saturate(160%) brightness(0.9);
+  -webkit-backdrop-filter: blur(34px) saturate(160%) brightness(0.9);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.22),
+    0 28px 60px rgba(0, 0, 0, 0.5),
+    0 8px 20px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.32),
+    inset 0 -18px 32px -22px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.38);
+  padding: 14px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel::-webkit-scrollbar {
+  width: 6px;
+}
+.panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+}
+.panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+.panel > * {
+  flex-shrink: 0;
+}
+
+/* A section = a soft frosted card. Grouping rows inside cards gives the panel
+   real visual hierarchy / depth instead of a flat list. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+  padding: 0 2px;
+}
+
+.section-meta {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  padding: 3px 4px;
+  border-radius: 9px;
+  margin: 0 -4px;
+  transition: background 0.15s;
+}
+.panel-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-name {
+  font-weight: 600;
+  min-width: 88px;
+}
+
+.panel-meta {
+  opacity: 0.6;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.row-x {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.panel-row:hover .row-x {
+  opacity: 1;
+}
+.row-x:hover {
+  color: rgba(248, 113, 113, 0.95);
+}
+
+.divider {
+  height: 1px;
+  background: var(--hairline);
+  margin: 1px 0;
+}
+
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.evt {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  opacity: 0.88;
+  padding: 1px 0;
+}
+
+.evt-time {
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 54px;
+}
+
+.evt-tag {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.evt-text {
+  opacity: 0.82;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  opacity: 0.45;
+  font-size: 12px;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.check {
+  width: 14px;
+  height: 14px;
+  stroke: var(--c-done);
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- minimal (resting) island ---------------------------------------- */
+.island.minimal {
+  padding: 0 14px;
+  height: 26px;
+  opacity: 0.66;
+}
+.island.minimal:hover {
+  opacity: 1;
+}
+.minimal-inner {
+  gap: 8px;
+  /* Same as island-row: content is interactive, rim is drag handle. */
+  -webkit-app-region: no-drag;
+}
+.minimal-inner .dot {
+  width: 7px;
+  height: 7px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: color 0.15s;
+}
+.link-btn:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.92);
+}
+.link-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ---- hooks (接入 Agent) ----------------------------------------------- */
+.hook-row {
+  gap: 9px;
+}
+.hook-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--c-idle);
+  box-shadow: inset 0 -1px 1.5px rgba(0, 0, 0, 0.25);
+}
+.hook-dot.ok {
+  background: var(--c-done);
+  box-shadow: 0 0 7px 0 rgba(143, 227, 181, 0.55);
+}
+.hook-dot.warn {
+  background: #f5d98c;
+  box-shadow: 0 0 7px 0 rgba(245, 217, 140, 0.5);
+}
+.hook-dot.off {
+  background: var(--c-idle);
+  opacity: 0.6;
+}
+.hook-state {
+  margin-left: 2px;
+  font-size: 12px;
+}
+.hook-btn {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.hook-btn:hover:not(:disabled) {
+  background: rgba(127, 200, 220, 0.22);
+  border-color: rgba(127, 200, 220, 0.5);
+}
+.hook-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hook-note {
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: 0.72;
+  padding: 6px 4px 0;
+}
+
+/* ---- memos ----------------------------------------------------------- */
+.memo-input input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  padding: 7px 11px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+}
+.memo-input input::placeholder {
+  color: rgba(255, 255, 255, 0.34);
+}
+.memo-input input:focus {
+  border-color: rgba(127, 200, 220, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(127, 200, 220, 0.14);
+}
+
+.memos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.memo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 4px;
+  margin: 0 -4px;
+  border-radius: 8px;
+  font-size: 13px;
+  overflow: hidden;
+  transition: background 0.15s;
+}
+.memo:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+.memo.completed .memo-text {
+  text-decoration: line-through;
+  opacity: 0.55;
+  /* Receives light from the green check dot */
+  text-shadow: 0 0 8px rgba(143, 227, 181, 0.2);
+}
+
+.memo-check {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.38);
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #06281d;
+  padding: 0;
+  transition: background 0.18s, border-color 0.18s, transform 0.12s;
+}
+.memo-check:hover {
+  border-color: rgba(143, 227, 181, 0.85);
+  transform: scale(1.08);
+}
+.memo-check.on {
+  background: var(--c-done);
+  border-color: var(--c-done);
+  color: #04231a;
+  /* Point light: green glow radiates from the checked circle,
+     illuminating the memo text to the right. */
+  box-shadow: 0 0 8px 1px rgba(143, 227, 181, 0.45),
+    0 0 20px 4px rgba(143, 227, 181, 0.12);
+}
+
+.memo-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.memo-x {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.memo:hover .memo-x {
+  opacity: 1;
+}
+.memo-x:hover {
+  color: rgba(248, 113, 113, 0.9);
+}
+
+/* ---- island row (agents + music) ------------------------------------- */
+.island-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  /* Content area stays interactive — clicks open/close the panel, buttons
+     work normally. Only the glass rim (island padding) is the drag handle. */
+  -webkit-app-region: no-drag;
+}
+.vsep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+}
+
+/* ---- compact music in island ----------------------------------------- */
+.media-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  opacity: 0.94;
+}
+.media-icon-sm {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: cover;
+  pointer-events: none;
+}
+.media-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+/* ---- notification flash bubble (full island) ------------------------- */
+.island.flashing {
+  background: rgba(24, 22, 30, 0.92);
+}
+.notif-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.notif-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #7fc8dc, #c9b6e4);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.notif-badge.sm {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+.notif-content {
+  min-width: 0;
+  flex: 1;
+}
+.notif-line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.notif-app {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+.notif-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notif-body {
+  font-size: 12px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- full media card in panel ---------------------------------------- */
+.media-full {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.media-art {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5a8c9 0%, #c9b6e4 55%, #a0c4e4 100%);
+  box-shadow: 0 5px 14px rgba(201, 182, 228, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+/* When an app icon is present, drop the gradient so the icon stands on its own. */
+.media-art.has-icon {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.media-icon-lg {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  pointer-events: none;
+}
+.media-art .eq {
+  color: #fff;
+  height: 16px;
+  width: 18px;
+}
+.media-meta {
+  flex: 1;
+  min-width: 0;
+}
+.media-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-artist {
+  font-size: 11px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+.media-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.media-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.1s;
+}
+.media-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.media-btn:active {
+  transform: scale(0.9);
+}
+.media-btn.play {
+  width: 36px;
+  height: 36px;
+  background: #fff;
+  color: #111;
+  border: none;
+  /* Point light: white glow radiates outward, illuminating neighbor buttons
+     and the song title text to the left. */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25),
+    0 0 12px 2px rgba(255, 255, 255, 0.3),
+    0 0 24px 6px rgba(255, 255, 255, 0.1);
+}
+.media-btn.play:hover {
+  background: #fff;
+  color: #111;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18),
+    0 3px 10px rgba(0, 0, 0, 0.25),
+    0 0 16px 3px rgba(255, 255, 255, 0.4),
+    0 0 36px 10px rgba(255, 255, 255, 0.12);
+}
+/* Neighbors of play button receive light: prev/next get inner glow, media
+   title gets a faint white text-shadow. */
+.media-controls:hover .media-btn:not(.play) {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.08);
+}
+.media-full:hover .media-title {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+.media-full:hover .media-art {
+  box-shadow: 0 5px 14px rgba(201, 182, 228, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ---- notification list in panel -------------------------------------- */
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.notif-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.notif-row-content {
+  min-width: 0;
+  flex: 1;
+}
+.notif-row-line1 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.notif-row-title {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notif-row-body {
+  font-size: 11px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+/* Respect reduced-motion: kill the looping flourishes, keep states legible. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .dot.working,
+  .eq.playing i,
+  .island::after {
+    animation: none !important;
+  }
+}
+
+/* ---- token / context usage ---------------------------------------------- */
+
+/* A session in the expand panel is grouped: the status row on top, the usage
+   breakdown nested underneath. The wrapper only adds vertical spacing. */
+.panel-session {
+  padding: 2px 0;
+  margin: 0 -4px;
+}
+.panel-session + .panel-session {
+  border-top: 1px solid var(--hairline);
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+/* Mini inline context bar shown inside the pill chip (expanded mode only). */
+.ctx-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+}
+.ctx-mini-track {
+  display: inline-block;
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.ctx-mini-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+.ctx-mini-text {
+  font-size: 11px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full usage breakdown under each session row in the expand panel. */
+.usage-row {
+  padding: 4px 4px 6px 22px; /* indent under the status dot */
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.usage-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease, background 0.3s ease;
+}
+.usage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.usage-stat strong {
+  color: var(--text);
+  font-weight: 600;
+  margin: 0 1px;
+}
+.usage-pct {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.usage-model {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.5;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+}
+
+/* ---- ETA chip in the pill ---- */
+.chip-eta {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- notify config ---- */
+.notify-url {
+  width: 100%;
+  margin: 6px 4px 2px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+}
+.notify-url:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ---- stats section ---- */
+.stats-agent {
+  padding: 6px 4px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.stats-agent:last-child {
+  border-bottom: none;
+}
+.stats-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 0 22px;
+}
+.stats-bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.stats-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--c-working);
+  transition: width 0.5s ease;
+}
+.stats-bar-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: right;
+}
+.stats-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 4px 2px 22px;
+}
+.stats-tool-chip {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- history section ---- */
+.hist-row-wrap {
+  border-bottom: 0.5px solid var(--hairline);
+}
+.hist-row-wrap:last-child {
+  border-bottom: none;
+}
+.hist-row {
+  cursor: pointer;
+}
+.hist-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.hist-time {
+  font-size: 11px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+}
+.hist-prompt {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-detail {
+  padding: 2px 4px 8px 22px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.hist-err {
+  color: var(--c-error);
+  margin-bottom: 4px;
+}
+.hist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.hist-model {
+  margin-left: auto;
+  font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* ======================================================================
+   LIGHT MODE
+   The dark theme is the default (above). Light mode is an opt-in override:
+   we flip the CSS variables and re-skin the glass surfaces so the capsule
+   reads well on a light wallpaper. Everything below is scoped to
+   `html.light`, which the main process toggles based on the user's choice
+   (or the OS theme, in "auto" mode).
+   ====================================================================== */
+html.light {
+  color-scheme: light;
+
+  /* Alpha values matched to dark mode (:root) so the glass transparency
+     feels identical between themes. */
+  --text: rgba(15, 17, 23, 0.96);
+  --text-dim: rgba(35, 39, 49, 0.62);
+  --hairline: rgba(0, 0, 0, 0.09);
+
+  /* State accents stay readable on a light surface — slightly deeper so they
+     don't wash out against white. Still macaron-family, just richer. */
+  --c-idle: #7a8290;
+  --c-working: #5baec9;
+  --c-working-2: #7ac4d9;
+  --c-done: #5dbd8a;
+  --c-error: #d17066;
+  --c-music: #c455a0;
+}
+
+/* ---- pill text: the dark-mode chip colours are near-white, which vanishes
+   on the frosted-white capsule. Override to dark, legible text. The state
+   accent (working blue / done green / error red) is carried by the .dot, so
+   the chip itself stays a neutral dark grey — the dot is the "light". */
+html.light .state-chip {
+  color: rgba(15, 17, 23, 0.62);
+}
+html.light .state-chip.working {
+  color: rgba(15, 17, 23, 0.9);
+}
+html.light .state-chip.idle {
+  color: rgba(50, 56, 68, 0.66);
+}
+html.light .state-chip.done {
+  color: rgba(93, 189, 138, 0.62);
+}
+html.light .state-chip.error {
+  color: rgba(209, 112, 102, 0.62);
+}
+/* The tool · time detail inside the chip — matched to dark mode opacity. */
+html.light .chip-time {
+  opacity: 0.72;
+}
+html.light .chip-eta {
+  opacity: 0.75;
+}
+html.light .chip-sep {
+  opacity: 0.4;
+}
+/* Agent label ("Claude") — color flipped to dark, opacity matched to dark. */
+html.light .label {
+  color: rgba(15, 17, 23, 0.96);
+  opacity: 0.97;
+}
+/* Badges & tags had white-tint backgrounds; flip to dark tint with matching
+   alpha values. */
+html.light .count-badge {
+  background: rgba(15, 23, 42, 0.1);
+  color: rgba(30, 34, 44, 0.85);
+}
+html.light .session-tag {
+  background: rgba(15, 23, 42, 0.05);
+  color: rgba(60, 64, 74, 0.6);
+}
+/* The panel-row status line (.sub) already uses var(--text-dim) which adapts;
+   opacity matched to dark mode. */
+html.light .panel-row .sub {
+  opacity: 0.65;
+}
+
+/* The glass capsule: swap the dark base for a frosted-white base. Alpha
+   values matched to dark mode so the glass transparency is identical. */
+html.light .island {
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.04) 30%,
+      rgba(255, 255, 255, 0) 62%
+    ),
+    rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(26px) saturate(165%) brightness(1.08);
+  -webkit-backdrop-filter: blur(26px) saturate(165%) brightness(1.08);
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 14px 34px rgba(15, 23, 42, 0.14),
+    0 3px 9px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.4),
+    inset 0 -10px 18px -12px rgba(15, 23, 42, 0.06),
+    0 0 26px -4px var(--halo);
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.4);
+}
+html.light .island:hover {
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 20px 46px rgba(15, 23, 42, 0.2),
+    0 5px 13px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.5),
+    inset 0 -10px 18px -12px rgba(15, 23, 42, 0.1),
+    0 0 30px -3px var(--halo);
+}
+
+/* The drop-down panel: same frosted-white treatment. Alpha values matched
+   to dark mode. */
+html.light .panel {
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.03) 18%,
+      rgba(255, 255, 255, 0) 42%
+    ),
+    rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(34px) saturate(160%) brightness(1.08);
+  -webkit-backdrop-filter: blur(34px) saturate(160%) brightness(1.08);
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 28px 60px rgba(15, 23, 42, 0.18),
+    0 8px 20px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.32),
+    inset 0 -18px 32px -22px rgba(15, 23, 42, 0.06);
+  text-shadow: 0 0.5px 1px rgba(255, 255, 255, 0.38);
+}
+
+/* Cards inside the panel: light grey tint, alpha matched to dark mode. */
+html.light .card {
+  background: rgba(15, 23, 42, 0.04);
+  border: 0.5px solid rgba(0, 0, 0, 0.07);
+}
+html.light .panel-row:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+/* Context / usage bars: alpha matched to dark mode. */
+html.light .ctx-mini-track,
+html.light .usage-bar,
+html.light .stats-bar {
+  background: rgba(15, 23, 42, 0.1);
+}
+html.light .usage-pct,
+html.light .stats-tool-chip {
+  background: rgba(15, 23, 42, 0.07);
+  color: var(--text-dim);
+}
+
+/* Form inputs — alpha matched to dark mode. */
+html.light .notify-url,
+html.light .memo-input input {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(0, 0, 0, 0.09);
+  color: var(--text);
+}
+html.light .memo-input input::placeholder {
+  color: rgba(15, 17, 23, 0.34);
+}
+html.light .memo-input input:focus {
+  background: rgba(15, 23, 42, 0.08);
+}
+html.light .notify-url:focus {
+  border-color: rgba(91, 174, 201, 0.25);
+}
+
+/* Hook / history detail rows: borders use --hairline, matched to dark mode. */
+html.light .hist-row:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+html.light .stats-bar-fill {
+  background: var(--c-working);
+}
+
+/* Completed memo — only dim the text (like dark mode), not the whole card. */
+html.light .panel-name {
+  color: var(--text);
+}
+
+/* Hook buttons: alpha matched to dark mode. */
+html.light .hook-btn {
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  color: rgba(15, 17, 23, 0.88);
+}
+html.light .hook-btn:hover:not(:disabled) {
+  background: rgba(91, 174, 201, 0.22);
+  border-color: rgba(91, 174, 201, 0.5);
+}
+html.light .hook-btn:disabled {
+  opacity: 0.4;
+}
+/* Hook note text — opacity matched to dark mode. */
+html.light .hook-note {
+  color: var(--text-dim);
+  opacity: 0.72;
+}
+/* Link buttons — alpha matched to dark mode. */
+html.light .link-btn {
+  color: rgba(15, 17, 23, 0.5);
+}
+html.light .link-btn:hover:not(:disabled) {
+  color: rgba(15, 17, 23, 0.92);
+}
+html.light .link-btn:disabled {
+  opacity: 0.3;
+}
+
+/* Media control buttons: alpha matched to dark mode. */
+html.light .media-btn {
+  background: rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.14);
+  color: rgba(15, 17, 23, 0.92);
+}
+html.light .media-btn:hover {
+  background: rgba(15, 23, 42, 0.2);
+  color: rgba(15, 17, 23, 0.96);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+html.light .media-btn.play {
+  background: rgba(15, 23, 42, 0.96);
+  color: rgba(255, 255, 255, 0.96);
+  border: none;
+}
+html.light .media-btn.play:hover {
+  background: rgba(15, 23, 42, 0.96);
+  color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.14), 0 3px 10px rgba(15, 23, 42, 0.2);
+}
+/* App icon container: give it a visible surface on white. */
+html.light .media-art.has-icon {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+/* Theme switcher row inside the panel. */
+.theme-row {
+  display: flex;
+  gap: 6px;
+  padding: 2px 4px;
+}
+.theme-btn {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 0.5px solid var(--hairline);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.theme-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+html.light .theme-btn:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+.theme-btn.active {
+  background: var(--c-working);
+  color: #fff;
+  border-color: transparent;
+  /* Point light: cyan glow radiates from the active button,
+     illuminating the neighbor (inactive) buttons. */
+  box-shadow: 0 0 10px 1px rgba(127, 200, 220, 0.4),
+    0 0 22px 5px rgba(127, 200, 220, 0.12);
+}
+/* Inactive neighbor buttons receive light from the active one. */
+.theme-btn:not(.active) {
+  /* Faint inner glow simulating light spilling from the active sibling */
+  box-shadow: inset 0 0 8px rgba(127, 200, 220, 0.06);
+}
+
+/* ---- Point light: light-mode adaptations --------------------------------
+   On a frosted-white surface, white glow is invisible and the state accent
+   colors need to be slightly richer to read. The dot's multi-layer glow
+   uses the light-mode accent values (deeper than dark mode), so it already
+   adapts via --c-working etc. Only a few hardcoded rgba values need
+   light-mode overrides. */
+html.light .media-btn.play {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25),
+    0 0 12px 2px rgba(255, 255, 255, 0.5),
+    0 0 24px 6px rgba(255, 255, 255, 0.15);
+}
+html.light .media-btn.play:hover {
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.14),
+    0 3px 10px rgba(0, 0, 0, 0.25),
+    0 0 16px 3px rgba(255, 255, 255, 0.6),
+    0 0 36px 10px rgba(255, 255, 255, 0.18);
+}
+/* Media neighbor illumination: use dark tint instead of white on light bg */
+html.light .media-controls:hover .media-btn:not(.play) {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.1);
+  box-shadow: inset 0 0 8px rgba(15, 23, 42, 0.04);
+}
+html.light .media-full:hover .media-title {
+  text-shadow: 0 0 10px rgba(91, 174, 201, 0.25);
+}
+/* Theme active button: slightly richer glow on white */
+html.light .theme-btn.active {
+  box-shadow: 0 0 10px 1px rgba(91, 174, 201, 0.4),
+    0 0 22px 5px rgba(91, 174, 201, 0.14);
+}
+html.light .theme-btn:not(.active) {
+  box-shadow: inset 0 0 8px rgba(91, 174, 201, 0.05);
+}

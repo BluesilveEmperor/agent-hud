@@ -1,0 +1,73 @@
+{
+  "name": "agent-hud",
+  "version": "3.0.0-beta.1",
+  "private": true,
+  "description": "桌面状态胶囊 · 实时显示 Claude Code / Codex / OpenCode / DevEco Code 的工作状态、token 用量与上下文占用",
+  "author": "AgentHUD",
+  "license": "MIT",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --port 5173 --strictPort",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm run build:renderer && npm run build:electron",
+    "stage": "node scripts/stage.mjs",
+    "dist": "npm run build && npm run stage",
+    "dist:win": "npm run build && node scripts/stage.mjs && iscc installer/light.iss",
+    "dist:mac": "npm run build && node scripts/stage.mjs && node scripts/pack-dmg.mjs",
+    "dist:linux": "npm run build && node scripts/stage.mjs && node scripts/pack-tarball.mjs",
+    "dist:all": "electron-builder --win --mac --linux",
+    "start": "electron .",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit"
+  },
+  "build": {
+    "appId": "com.agenthud.app",
+    "productName": "AgentHUD",
+    "directories": {
+      "output": "release/electron-builder"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "bridge/**/*",
+      "hooks/**/*",
+      "installer/light.ico",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "installer/light.ico"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "installer/light.ico",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "installer/light.ico",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "dependencies": {
+    "framer-motion": "^11.11.17",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.10",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "electron": "30.5.1",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
