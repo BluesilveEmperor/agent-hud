@@ -1,9 +1,9 @@
 # AGENT HUD · 桌面状态胶囊
 
 > 屏幕常驻的悬浮胶囊，实时展示 **Claude Code / Codex / OpenCode / DevEco Code** 的工作状态、token 用量与上下文占用。
-> 磨砂玻璃质感，余光一瞥就知道 AI 在干活、做完了还是出错了，不用切窗口。
+> 磨砂玻璃质感 + 双边流光 + 点光源效果，余光一瞥就知道 AI 在干活、做完了还是出错了，不用切窗口。
 
-基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换等功能。
+基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换、HarmonyOS 风格视效等功能。
 
 ## 功能一览
 
@@ -11,6 +11,16 @@
 - **状态一目了然**：工作中泛蓝光呼吸、完成变绿打勾、出错变红抖动，显示当前工具与用时
 - **多会话 / 多 agent**：Claude Code、Codex、OpenCode、DevEco Code 同时跑也能分栏显示
 - **可拖动胶囊**：按住胶囊边缘空白处即可拖到屏幕任意位置，点击内容区展开/收起面板
+
+### HarmonyOS 风格视效（3.0 新增）
+- **双边流光**：青色 `#1AD0F1` + 粉色 `#FFA4E5` 两条彗星沿胶囊圆角边框旋转，4 秒一圈（参考 HarmonyOS UI Design Kit 官方规格）
+- **点光源效果**：状态圆点、播放按钮、主题切换按钮、备忘录勾选圆作为光源发光，邻居文字/按钮受光染色
+  - Agent 圆点工作时发出青色三层辐射光，照亮旁边的名称和状态文字
+  - 播放按钮发白光辐射，照亮相邻的上一曲/下一曲按钮和歌名
+  - 主题 active 按钮发青光照亮邻居按钮
+  - 备忘录勾选发绿光照亮文字
+- **马卡龙配色**：柔和的马卡龙色系（薰衣草灰、粉蓝、开心果绿、草莓粉），告别饱和硬朗
+- **浅色模式对齐**：深浅模式透明度完全一致，浅色模式同样能透出壁纸
 
 ### Token 用量与上下文
 - **上下文进度条**：实时显示当前上下文窗口占用（如 87k / 200k），颜色随占用率变化（绿 < 70% < 琥珀 < 90% < 红）
@@ -34,12 +44,13 @@
 
 ### 主题与外观
 - **三种主题**：深色（默认）/ 浅色 / 跟随系统，托盘菜单或面板内一键切换
-- **磨砂玻璃 UI**：任何壁纸下都清晰，深浅模式均适配
+- **磨砂玻璃 UI**：任何壁纸下都清晰，深浅模式透明度完全对齐，均能透出桌面壁纸
+- **马卡龙配色**：柔和马卡龙色系，状态点、光晕、流光色彩统一
 
 ### 其他
 - **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code 自动拷贝 plugin
 - **桌面备忘录**：随手记下待办
-- **媒体控制**：显示当前播放的音乐，可上一首/下一首/暂停
+- **媒体控制**：显示当前播放的音乐，左侧展示来源媒体应用的应用图标（自动提取），可上一首/下一首/暂停
 - **纯本地**：只监听 `127.0.0.1`，不联网、不上传任何数据
 
 ## 截图（示意）
@@ -48,14 +59,15 @@
        ╭──────────────────────────────────────────────────────────────╮
        │ ● Claude Bash · 42s · ⏳~4m · ▓▓░░ 87k │ ● OpenCode 完成    │
        ╰──────────────────────────────────────────────────────────────╯
+                    ↑ 双边流光环绕（青+粉彗星旋转）
               hover → 展开当前任务摘要 + 上下文进度条
               click → 展开事件流 / 历史 / 统计 / 通知设置 / 主题
 ```
 
 - `●` 灰：idle
-- `●` 蓝（呼吸光晕）：working
-- `●` 绿（勾选动画）：done
-- `●` 红（抖动）：error
+- `●` 蓝（三层呼吸光晕 + 邻居文字受光）：working
+- `●` 绿（勾选动画 + 绿光辐射）：done
+- `●` 红（抖动 + 红光辐射）：error
 
 ## 快速开始
 
@@ -80,14 +92,14 @@ npm run dev
 ```bash
 npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
-# → release/AgentHUD-Setup-2.0.0.exe
+# → release/AgentHUD-Setup-3.0.0-beta.exe
 ```
 
 #### macOS
 
 ```bash
 npm run dist:mac      # build + stage + pack-dmg
-# → release/AgentHUD-2.0.0.dmg
+# → release/AgentHUD-3.0.0-beta.dmg
 ```
 
 `pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
@@ -96,12 +108,12 @@ npm run dist:mac      # build + stage + pack-dmg
 
 ```bash
 npm run dist:linux    # build + stage + pack-tarball
-# → release/AgentHUD-2.0.0-linux-x64.tar.gz
+# → release/AgentHUD-3.0.0-beta-linux-x64.tar.gz
 ```
 
 解压后运行：
 ```bash
-tar xzf AgentHUD-2.0.0-linux-x64.tar.gz
+tar xzf AgentHUD-3.0.0-beta-linux-x64.tar.gz
 ./AgentHUD/run.sh
 ```
 
@@ -123,8 +135,8 @@ npx electron-builder --linux  # Linux: AppImage + deb
 仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
 
 ```bash
-git tag v2.0.0
-git push origin v2.0.0
+git tag v3.0.0-beta
+git push origin v3.0.0-beta
 # → Actions 页面查看构建进度，完成后 Release 页面下载安装包
 ```
 
@@ -197,6 +209,8 @@ agent-hud/
 │   ├── agent-wrap.mjs        # 通用包装兜底
 │   └── README.md             # 手动接入说明
 ├── bridge/                    # Windows PowerShell 辅助脚本
+│   ├── win-bridge.ps1         # 媒体检测 + 应用图标提取（SMTC）
+│   └── media-control.ps1      # 媒体播放控制（上一曲/下一曲/暂停）
 ├── installer/
 │   ├── light.iss             # Inno Setup 脚本
 │   └── light.ico
