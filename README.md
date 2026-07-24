@@ -92,14 +92,14 @@ npm run dev
 ```bash
 npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
-# → release/AgentHUD-Setup-3.0.0-beta.exe
+# → release/AgentHUD-Setup-3.0.0.exe
 ```
 
 #### macOS
 
 ```bash
 npm run dist:mac      # build + stage + pack-dmg
-# → release/AgentHUD-3.0.0-beta.dmg
+# → release/AgentHUD-3.0.0.dmg
 ```
 
 `pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
@@ -108,12 +108,12 @@ npm run dist:mac      # build + stage + pack-dmg
 
 ```bash
 npm run dist:linux    # build + stage + pack-tarball
-# → release/AgentHUD-3.0.0-beta-linux-x64.tar.gz
+# → release/AgentHUD-3.0.0-linux-x64.tar.gz
 ```
 
 解压后运行：
 ```bash
-tar xzf AgentHUD-3.0.0-beta-linux-x64.tar.gz
+tar xzf AgentHUD-3.0.0-linux-x64.tar.gz
 ./AgentHUD/run.sh
 ```
 
@@ -135,8 +135,8 @@ npx electron-builder --linux  # Linux: AppImage + deb
 仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
 
 ```bash
-git tag v3.0.0-beta
-git push origin v3.0.0-beta
+git tag v3.0.0
+git push origin v3.0.0
 # → Actions 页面查看构建进度，完成后 Release 页面下载安装包
 ```
 
