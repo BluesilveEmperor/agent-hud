@@ -3,7 +3,9 @@
 > 屏幕常驻的悬浮胶囊，实时展示 **Claude Code / Codex / OpenCode / DevEco Code** 的工作状态、token 用量与上下文占用。
 > 磨砂玻璃质感 + 双边流光 + 点光源效果，余光一瞥就知道 AI 在干活、做完了还是出错了，不用切窗口。
 
-基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换、HarmonyOS 风格视效等功能。
+基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换、HarmonyOS 风格视效、WSL 调用监控等功能。
+
+当前版本 **4.1.0**。
 
 ## 功能一览
 
@@ -28,44 +30,47 @@
 - **完成预测 ETA**：根据 token 消耗速率估算"上下文还需多久填满"，显示在胶囊上（如 `⏳~4m`）
 - **数据来源**：Claude Code 解析 transcript jsonl 获取真实 usage；OpenCode/DevEco 从 message API 读取
 
+### WSL 调用监控（4.0 新增，4.1 完善）
+- **实时识别**：agent 发起 `wsl` / `wsl.exe` 命令（含 `-e`、`-d <发行版>`、`bash -c "wsl …"` 等形态）时，胶囊与面板显示青色 `WSL` 徽标 + 发行版 + WSL 内实际命令
+- **进度可视化**：胶囊与面板显示薄荷绿进度条 + 百分比，按该命令的历史平均时长估算（如 `python train.py · 56%`）；新命令首次执行时提示"暂无进度估算"
+- **历史与统计**：每次 WSL 调用记入 `history.jsonl`（含按命令拆分的时长），「统计 · 今日」面板展示各 agent 与全局的 WSL 调用次数、耗时与 Top 命令
+- **完成通知**：跑过 WSL 命令的会话完成/出错时，通知标题带 `WSL` 标记，正文与 webhook 附最近一次 WSL 命令
+- **零侵入**：纯文本级识别命令字符串，不在 WSL 内安装任何脚本、不改 agent 工作流；`wslpath`、`/mnt/wsl/...` 路径与普通文本里的 `wsl` 单词不会误判
+- **全 agent 支持**：Claude Code / Codex / OpenCode / DevEco Code 上报的命令文本都会识别。OpenCode/DevEco 从 `tool.execute.before` 的入参读取命令，Claude/Codex 从 `PreToolUse` 的 `tool_input` 读取
+
 ### 完成通知
-- **系统通知**：会话完成/出错时弹出 Windows toast 通知，标题 + prompt 摘要 + 耗时 + token 数
+- **系统通知**：会话完成/出错时弹出系统 toast 通知，标题 + prompt 摘要 + 耗时 + token 数
 - **Webhook**：可选推送到企业微信 / 飞书 / Slack / 自建服务，让你不在电脑前也能收到
 - **防抖**：8 秒以下短任务不通知，同一会话 30 秒内不重复通知
 
 ### 会话历史
 - **持久化记录**：每个完成的会话落盘到本地 `history.jsonl`（自动保留 30 天）
-- **历史回放**：展开面板查看今日历史，点开看详情——工具调用分布、上下文用量、模型、错误信息
+- **历史回放**：展开面板查看今日历史，点开看详情——工具调用分布、上下文用量、模型、错误信息、WSL 调用
 
 ### Agent 行为分析
-- **今日统计**：各 agent 的会话数、错误数、总耗时、总 token（带对比柱状图）
+- **今日统计**：各 agent 的会话数、错误数、总耗时、总 token、WSL 调用次数（带对比柱状图）
 - **工具排行**：最常用工具 Top 5
 - **平均上下文**：了解你的 agent 上下文使用习惯
+- **WSL 排行**：最常用 WSL 命令 Top 5
 
 ### 主题与外观
 - **三种主题**：深色（默认）/ 浅色 / 跟随系统，托盘菜单或面板内一键切换
 - **磨砂玻璃 UI**：任何壁纸下都清晰，深浅模式透明度完全对齐，均能透出桌面壁纸
 - **马卡龙配色**：柔和马卡龙色系，状态点、光晕、流光色彩统一
 
-### WSL 调用监控（4.0 新增）
-- **实时识别**：agent 发起 `wsl` / `wsl.exe` 命令（含 `-e`、`-d <发行版>`、`bash -c "wsl …"` 等形态）时，胶囊与面板显示青色 `WSL` 徽标 + 发行版 + WSL 内实际命令
-- **进度可视化**：胶囊与面板显示薄荷绿进度条 + 百分比，按该命令的历史平均时长估算（如 `python train.py · 56%`）；新命令首次执行时提示"暂无进度估算"
-- **历史与统计**：每次 WSL 调用记入 `history.jsonl`（含按命令拆分的时长），「统计 · 今日」面板展示各 agent 与全局的 WSL 调用次数、耗时与 Top 命令
-- **完成通知**：跑过 WSL 命令的会话完成/出错时，通知标题带 `WSL` 标记，正文与 webhook 附最近一次 WSL 命令
-- **零侵入**：纯文本级识别命令字符串，不在 WSL 内安装任何脚本、不改 agent 工作流；`wslpath`、`/mnt/wsl/...` 路径与普通文本里的 `wsl` 单词不会误判
-- **全 agent 支持**：Claude Code / Codex / OpenCode / DevEco Code 上报的命令文本都会识别。OpenCode/DevEco 从 `tool.execute.before` 的入参读取命令，Claude/Codex 从 `PreToolUse` 的 `tool_input` 读取（v4.0.1 已修正 OpenCode 取错字段导致 WSL 监控失效的问题）
-
 ### 其他
 - **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code 自动拷贝 plugin
 - **桌面备忘录**：随手记下待办
-- **媒体控制**：显示当前播放的音乐，左侧展示来源媒体应用的应用图标（自动提取），可上一首/下一首/暂停
+- **媒体控制**：显示当前播放的音乐，左侧展示来源媒体应用的应用图标（自动提取），可上一首/下一首/暂停（仅 Windows SMTC）
 - **纯本地**：只监听 `127.0.0.1`，不联网、不上传任何数据
+- **浏览器内调试**：`npm run dev:web` 即可在普通浏览器中开发调试 UI（内置 mock 数据，见 `src/devMock.ts`）
 
 ## 截图（示意）
 
 ```
        ╭──────────────────────────────────────────────────────────────╮
-       │ ● Claude Bash · 42s · ⏳~4m · ▓▓░░ 87k │ ● OpenCode 完成    │
+       │ ● Claude WSL · Ubuntu · python train.py · 56% · 1m23s       │
+       │ ● Codex 完成 · 1m · ▓▓░░ 87k                               │
        ╰──────────────────────────────────────────────────────────────╯
                     ↑ 双边流光环绕（青+粉彗星旋转）
               hover → 展开当前任务摘要 + 上下文进度条
@@ -91,23 +96,33 @@ npm run dev
 
 启动后屏幕顶部中央出现胶囊。鼠标移上去展开摘要，点击展开完整面板。
 
+### 浏览器内开发调试（无需 Electron）
+
+```bash
+npm run dev:web    # 在浏览器打开 http://localhost:5173
+```
+
+内置 mock 数据，支持 URL 参数切换状态：
+- `?mock=working` / `?mock=done` / `?mock=error` / `?mock=idle` / `?mock=multi` / `?mock=cycle`
+- `?bg=dark` / `?bg=white` / `?bg=photo`
+
 ### 打包安装包
 
-项目支持 **Windows / macOS / Linux** 三平台。Electron 本身跨平台，代码已做平台适配（Windows 媒体控制在 Mac/Linux 自动禁用，窗口属性按平台调整）。
+项目支持 **Windows / macOS / Linux** 三平台。Electron 本身跨平台，代码已做平台适配。
 
 #### Windows（需要 Inno Setup）
 
 ```bash
 npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
-# → release/AgentHUD-Setup-4.0.0.exe
+# → release/AgentHUD-Setup-4.1.0.exe
 ```
 
 #### macOS
 
 ```bash
 npm run dist:mac      # build + stage + pack-dmg
-# → release/AgentHUD-4.0.0.dmg
+# → release/AgentHUD-4.1.0.dmg
 ```
 
 `pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
@@ -116,12 +131,12 @@ npm run dist:mac      # build + stage + pack-dmg
 
 ```bash
 npm run dist:linux    # build + stage + pack-tarball
-# → release/AgentHUD-4.0.0-linux-x64.tar.gz
+# → release/AgentHUD-4.1.0-linux-x64.tar.gz
 ```
 
 解压后运行：
 ```bash
-tar xzf AgentHUD-4.0.0-linux-x64.tar.gz
+tar xzf AgentHUD-4.1.0-linux-x64.tar.gz
 ./AgentHUD/run.sh
 ```
 
@@ -138,15 +153,26 @@ npx electron-builder --mac    # macOS: DMG
 npx electron-builder --linux  # Linux: AppImage + deb
 ```
 
+> electron-builder 要求 ICO 文件包含 256×256 条目。仓库自带 `scripts/fix-ico256.mjs` 自动为 `installer/light.ico` 生成 256×256 PNG 条目（纯 Node + zlib，无额外依赖）。CI 中已自动执行该步骤。
+
 #### CI 自动构建（GitHub Actions）
 
 仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
 
 ```bash
-git tag v4.0.0
-git push origin v4.0.0
+git tag v4.1.0
+git push origin v4.1.0
 # → Actions 页面查看构建进度，完成后 Release 页面下载安装包
 ```
+
+CI 流程：
+1. 安装 Node 22 + 项目依赖
+2. 自动运行 `fix-ico256.mjs` 确保 ICO 文件满足 electron-builder 的 256×256 要求
+3. 三平台并行构建：
+   - Windows：Inno Setup 安装包
+   - macOS：DMG 镜像
+   - Linux：tarball 压缩包
+4. 自动创建 GitHub Release 并上传全部产物
 
 ### 平台差异说明
 
@@ -159,6 +185,7 @@ git push origin v4.0.0
 | 会话历史 / 统计 | 完整支持 | 完整支持 | 完整支持 |
 | 主题切换 | 完整支持 | 完整支持 | 完整支持 |
 | 媒体控制（播放/暂停等） | SMTC 支持 | 暂不支持 | 暂不支持 |
+| WSL 调用监控 | 完整支持 | 完整支持 | 完整支持 |
 | 一键接入 hooks | 完整支持 | 完整支持 | 完整支持 |
 
 ## 接入 Agent
@@ -184,29 +211,34 @@ agent-hud/
 ├── index.html
 ├── scripts/
 │   ├── dev.mjs               # 开发启动脚本
-│   └── stage.mjs             # 打包 stage 脚本
+│   ├── stage.mjs             # 打包 stage 脚本
+│   ├── fix-ico256.mjs        # 为 light.ico 生成 256×256 PNG 条目
+│   ├── pack-dmg.mjs          # macOS DMG 打包（用 hdiutil，无额外依赖）
+│   └── pack-tarball.mjs      # Linux tarball 打包
 ├── electron/                  # 主进程（Node）
 │   ├── main.ts               # 入口：窗口 / 托盘 / IPC / 主题
 │   ├── preload.ts            # 安全 bridge
 │   ├── server.ts             # 本地 HTTP 服务 (127.0.0.1:51789)
-│   ├── state.ts              # 事件状态机 + ETA 预测
+│   ├── state.ts              # 事件状态机 + ETA 预测 + WSL 进度
 │   ├── memos.ts              # 备忘录持久化
 │   ├── system.ts             # 系统状态（媒体等）
 │   ├── winbridge.ts          # Windows SMTC / 通知
 │   ├── hooks-setup.ts        # 一键接入（hooks JSON / plugin 双模式）
-│   ├── history.ts            # 会话历史持久化 + 统计
-│   ├── notifier.ts           # 完成通知（系统通知 + webhook）
-│   └── theme.ts              # 主题存储（深色/浅色/跟随系统）
+│   ├── history.ts            # 会话历史持久化 + 统计 + WSL 记录
+│   ├── notifier.ts           # 完成通知（系统通知 + webhook + WSL 标记）
+│   ├── theme.ts              # 主题存储（深色/浅色/跟随系统）
+│   └── wsl.ts                # WSL 调用检测（纯文本零侵入）
 ├── src/                       # 渲染层（React + Framer Motion）
 │   ├── App.tsx
 │   ├── main.tsx
+│   ├── devMock.ts            # 浏览器开发调试 mock 数据
 │   ├── styles.css
 │   ├── types.ts
 │   ├── usage.ts              # token 格式化工具
 │   ├── hooks/useLightEvents.ts
 │   └── components/
 │       ├── Island.tsx        # 胶囊主体（可拖动）
-│       ├── AgentPill.tsx     # 单 agent 分栏
+│       ├── AgentPill.tsx     # 单 agent 分栏 + WSL 进度条
 │       ├── ExpandPanel.tsx   # 展开面板（状态/接入/通知/统计/历史/主题）
 │       └── MediaCard.tsx     # 媒体控制
 ├── hooks/                     # 注入各 agent 的脚本
@@ -221,7 +253,7 @@ agent-hud/
 │   └── media-control.ps1      # 媒体播放控制（上一曲/下一曲/暂停）
 ├── installer/
 │   ├── light.iss             # Inno Setup 脚本
-│   └── light.ico
+│   └── light.ico             # 应用图标（含 256×256 PNG 条目）
 └── PRD.md                     # 产品需求文档
 ```
 
@@ -255,6 +287,7 @@ agent-hud/
 - **不联网、不收集数据**：没有遥测/上报；备忘录、历史、配置只存在本机 `%AppData%`
 - **渲染层隔离**：`contextIsolation: true`、`nodeIntegration: false`
 - **不执行任意命令**：`/event` 只接收字符串字段用于显示
+- **WSL 零侵入**：不修改 WSL 内任何东西，纯文本匹配
 
 ## 技术栈
 

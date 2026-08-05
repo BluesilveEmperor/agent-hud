@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Fix ICO 256×256 entry (for electron-builder compatibility)
+        run: node scripts/fix-ico256.mjs
+
       - name: Build renderer + electron
         run: npm run build
 
