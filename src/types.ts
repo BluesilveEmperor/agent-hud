@@ -27,6 +27,10 @@ export interface LightEvent {
   message?: string;
   timestamp: string;
   usage?: Usage;
+  // True when a tool_use event was detected as a WSL invocation.
+  wsl?: boolean;
+  // The command that runs inside WSL (parsed by detectWsl), for stats.
+  wslCommand?: string;
 }
 
 export interface SessionState {
@@ -42,6 +46,15 @@ export interface SessionState {
   recent: LightEvent[];
   usage?: Usage;
   etaSeconds?: number;
+  // Live WSL invocation info while the agent is (or last was) running a
+  // `wsl ...` command.
+  wsl?: {
+    command: string;
+    distro?: string;
+    startedAt: string;
+    // Estimated total duration from historical averages of the same command.
+    estimatedTotalMs?: number;
+  };
 }
 
 export interface AppState {
@@ -120,6 +133,10 @@ export interface SessionRecord {
   tools: Record<string, number>;
   usage?: Usage;
   error?: string;
+  wslCount: number;
+  wslCommands: Record<string, number>;
+  wslCommandDurations: Record<string, number>;
+  wslDurationMs: number;
 }
 
 export interface HistoryQuery {
@@ -138,6 +155,9 @@ export interface AgentStats {
   avgContextTokens?: number;
   toolCount: number;
   topTools: { tool: string; count: number }[];
+  wslCount: number;
+  wslDurationMs: number;
+  topWslCommands: { tool: string; count: number }[];
 }
 
 export interface Stats {
@@ -149,6 +169,9 @@ export interface Stats {
   totalTokens: number;
   totalDurationMs: number;
   topTools: { tool: string; count: number }[];
+  totalWslCount: number;
+  totalWslDurationMs: number;
+  topWslCommands: { tool: string; count: number }[];
 }
 
 export interface NotifyConfig {

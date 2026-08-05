@@ -71,15 +71,31 @@ interface AgentConfig {
 
 // dev      → <repo>/hooks                       (__dirname = <repo>/dist-electron)
 // packaged → <install>/hooks                    (__dirname = <install>/resources/app/dist-electron)
+//
+// IMPORTANT: When running from inside an ASAR archive, paths like
+// "app.asar/hooks" resolve via Electron's virtual filesystem and fs.existsSync
+// returns true, but Node.js cannot execute files inside ASAR.  We must check
+// external paths FIRST and skip any path that falls inside an .asar file.
 function resolveHooksDir(): string | null {
-  const candidates = [
-    path.join(__dirname, "..", "hooks"),
-    path.join(__dirname, "..", "..", "..", "hooks"),
-  ];
+  // Candidate order matters: external paths first, ASAR-internal last.
+  const candidates: string[] = [];
+
+  // 1. External hooks directory (packaged): <install>/hooks
+  //    __dirname = .../resources/app/dist-electron  →  go up 3 levels
+  candidates.push(path.join(__dirname, "..", "..", "..", "hooks"));
+
+  // 2. Via process.resourcesPath (packaged): <install>/hooks
   if (process.resourcesPath) {
     candidates.push(path.join(process.resourcesPath, "..", "hooks"));
   }
+
+  // 3. Dev mode: <repo>/hooks  (only valid when running from source)
+  candidates.push(path.join(__dirname, "..", "hooks"));
+
   for (const dir of candidates) {
+    // Skip paths that fall inside an .asar archive — Node can't execute them.
+    if (dir.includes(".asar" + path.sep) || dir.includes(".asar/")) continue;
+
     try {
       if (
         fs.existsSync(path.join(dir, "claude-hook.mjs")) ||
@@ -139,6 +155,7 @@ function agentConfigs(): Record<AgentKey, AgentConfig> {
         { event: "UserPromptSubmit", type: "user_prompt" },
         { event: "PreToolUse", type: "tool_use", matcher: "*" },
         { event: "Stop", type: "stop" },
+        { event: "SessionEnd", type: "session_end" },
       ],
     },
     opencode: {

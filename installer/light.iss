@@ -7,11 +7,11 @@
 ;                             → produces ..\release\AgentHUD\
 ;    2) iscc installer\light.iss
 ;
-;  Output:  ..\release\AgentHUD-Setup-3.0.0-beta.exe   (per-user, no admin needed)
+; Output:  ..\release\AgentHUD-Setup-4.1.0.exe   (per-user, no admin needed)
 ; ============================================================================
 
 #define MyAppName "AgentHUD"
-#define MyAppVersion "3.0.0"
+#define MyAppVersion "4.1.0"
 #define MyAppPublisher "AgentHUD"
 #define MyAppExeName "AgentHUD.exe"
 
@@ -22,7 +22,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion=3.0.0.0
+VersionInfoVersion=4.1.0.0
 VersionInfoProductName={#MyAppName}
 
 ; Per-user install → no UAC prompt, lands in %LocalAppData%\Programs\AgentHUD.

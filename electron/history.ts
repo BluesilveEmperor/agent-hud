@@ -21,6 +21,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import type { AgentId, LightEvent, Usage } from "./state";
+import { wslCommandKey } from "./wsl";
 
 export interface SessionRecord {
   id: string; // agent::sessionId — unique within its day
@@ -36,6 +37,11 @@ export interface SessionRecord {
   tools: Record<string, number>; // tool name -> count
   usage?: Usage;
   error?: string;
+  // WSL invocation stats, derived from the session's recent events.
+  wslCount: number;
+  wslCommands: Record<string, number>; // wsl inner command -> count
+  wslCommandDurations: Record<string, number>; // wsl inner command -> ms spent
+  wslDurationMs: number; // cumulative time spent inside WSL (approx)
 }
 
 export interface HistoryQuery {
@@ -54,6 +60,9 @@ export interface AgentStats {
   avgContextTokens?: number;
   toolCount: number;
   topTools: { tool: string; count: number }[];
+  wslCount: number;
+  wslDurationMs: number;
+  topWslCommands: { tool: string; count: number }[];
 }
 
 export interface Stats {
@@ -65,6 +74,9 @@ export interface Stats {
   totalTokens: number;
   totalDurationMs: number;
   topTools: { tool: string; count: number }[];
+  totalWslCount: number;
+  totalWslDurationMs: number;
+  topWslCommands: { tool: string; count: number }[];
 }
 
 const RETENTION_DAYS = 30;
@@ -178,6 +190,38 @@ export class HistoryStore extends EventEmitter {
         toolCount++;
       }
     }
+    // WSL stats: count wsl-marked tool_use events and approximate the time
+    // each spent by the gap to the next event (or session end). The events
+    // array is newest-first, so we walk it chronologically.
+    //
+    // Aggregate keyed on the command STEM (first token, via wslCommandKey) so
+    // `python train.py --epochs 50` and `python train.py` share one history
+    // bucket — otherwise every distinct argument list would be its own key and
+    // the live pill could never show a percentage. We still keep the full
+    // command string on the event for display.
+    const wslCommands: Record<string, number> = {};
+    const wslCommandDurations: Record<string, number> = {};
+    let wslCount = 0;
+    let wslDurationMs = 0;
+    const chronological = [...input.events].reverse();
+    for (let i = 0; i < chronological.length; i++) {
+      const e = chronological[i];
+      if (!e.wsl || e.type !== "tool_use") continue;
+      wslCount++;
+      const fullCmd = e.wslCommand || e.message || e.tool || "wsl";
+      const key = wslCommandKey(fullCmd) || fullCmd;
+      wslCommands[key] = (wslCommands[key] ?? 0) + 1;
+      const endTs =
+        i + 1 < chronological.length
+          ? new Date(chronological[i + 1].timestamp).getTime()
+          : new Date(input.endedAt).getTime();
+      const d = endTs - new Date(e.timestamp).getTime();
+      if (d > 0) {
+        wslDurationMs += d;
+        wslCommandDurations[key] = (wslCommandDurations[key] ?? 0) + d;
+      }
+    }
+
     const rec: SessionRecord = {
       id: `${input.agent}::${input.sessionId}::${input.startedAt ?? input.endedAt}`,
       agent: input.agent,
@@ -192,6 +236,10 @@ export class HistoryStore extends EventEmitter {
       tools,
       usage: input.usage,
       error: input.error,
+      wslCount,
+      wslCommands,
+      wslCommandDurations,
+      wslDurationMs,
     };
     this.append(rec);
     this.emit("record", rec);
@@ -214,6 +262,30 @@ export class HistoryStore extends EventEmitter {
     return out;
   }
 
+  // Historical average duration (ms) of a single WSL command invocation,
+  // across all recorded sessions. Used by the live pill to estimate how long
+  // a running `wsl …` command will take. Returns undefined when the command
+  // has no history yet (e.g. first run, or old records without per-command
+  // durations) — the caller should then show "running" without a percentage.
+  //
+  // `command` should be the command STEM (see wslCommandKey) so different
+  // argument lists collapse into one bucket; we also probe the full command
+  // as a fallback for backward-compatible callers.
+  wslAvgDuration(command: string): number | undefined {
+    const stem = wslCommandKey(command) || command;
+    let totalMs = 0;
+    let totalCount = 0;
+    for (const r of this.records) {
+      if (!r.wslCommands || !r.wslCommandDurations) continue;
+      const count = r.wslCommands[stem] ?? r.wslCommands[command];
+      if (!count) continue;
+      totalCount += count;
+      totalMs += r.wslCommandDurations[stem] ?? r.wslCommandDurations[command] ?? 0;
+    }
+    if (totalCount === 0) return undefined;
+    return totalMs / totalCount;
+  }
+
   // Compute aggregate stats over a time window. Default = today (local).
   stats(opts: { since?: string; until?: string } = {}): Stats {
     const now = new Date();
@@ -223,9 +295,12 @@ export class HistoryStore extends EventEmitter {
 
     const byAgent = new Map<AgentId, AgentStats>();
     const toolTotals = new Map<string, number>();
+    const wslCommandTotals = new Map<string, number>();
     let totalTokens = 0;
     let totalDurationMs = 0;
     let totalErrors = 0;
+    let totalWslCount = 0;
+    let totalWslDurationMs = 0;
 
     for (const r of records) {
       let s = byAgent.get(r.agent);
@@ -238,6 +313,9 @@ export class HistoryStore extends EventEmitter {
           totalTokens: 0,
           toolCount: 0,
           topTools: [],
+          wslCount: 0,
+          wslDurationMs: 0,
+          topWslCommands: [],
         };
         byAgent.set(r.agent, s);
       }
@@ -264,9 +342,23 @@ export class HistoryStore extends EventEmitter {
       for (const [tool, count] of Object.entries(r.tools)) {
         toolTotals.set(tool, (toolTotals.get(tool) ?? 0) + count);
       }
+      if (r.wslCount > 0) {
+        s.wslCount += r.wslCount;
+        s.wslDurationMs += r.wslDurationMs || 0;
+        totalWslCount += r.wslCount;
+        totalWslDurationMs += r.wslDurationMs || 0;
+        for (const [cmd, count] of Object.entries(r.wslCommands || {})) {
+          wslCommandTotals.set(cmd, (wslCommandTotals.get(cmd) ?? 0) + count);
+        }
+      }
     }
 
     const topTools = [...toolTotals.entries()]
+      .map(([tool, count]) => ({ tool, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const topWslCommands = [...wslCommandTotals.entries()]
       .map(([tool, count]) => ({ tool, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -275,6 +367,11 @@ export class HistoryStore extends EventEmitter {
       s.topTools = [...toolTotals.entries()]
         .filter(([tool]) => records.some((r) => r.agent === s.agent && r.tools[tool]))
         .map(([tool, count]) => ({ tool, count: records.filter((r) => r.agent === s.agent).reduce((n, r) => n + (r.tools[tool] ?? 0), 0) }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      s.topWslCommands = [...wslCommandTotals.entries()]
+        .filter(([tool]) => records.some((r) => r.agent === s.agent && r.wslCommands && r.wslCommands[tool]))
+        .map(([tool, count]) => ({ tool, count: records.filter((r) => r.agent === s.agent).reduce((n, r) => n + ((r.wslCommands ?? {})[tool] ?? 0), 0) }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
     }
@@ -288,6 +385,9 @@ export class HistoryStore extends EventEmitter {
       totalTokens,
       totalDurationMs,
       topTools,
+      totalWslCount,
+      totalWslDurationMs,
+      topWslCommands,
     };
   }
 }

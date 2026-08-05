@@ -458,6 +458,11 @@ app.whenReady().then(() => {
   notifier = new Notifier(userData);
   themeStore = new ThemeStore(userData);
 
+  // Give the live pill an estimated duration for a running WSL command, from
+  // this command's historical average in past sessions. No history → the pill
+  // shows "running" without a percentage.
+  store.setWslEstimator((cmd) => historyStore?.wslAvgDuration(cmd));
+
   startServer(store, DEFAULT_PORT);
   createWindow();
   createTray();

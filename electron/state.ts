@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { detectWsl, wslCommandKey, type WslInfo } from "./wsl";
 
 export type AgentId = "claude-code" | "codex" | "trae" | "opencode" | "deveco-code";
 export type AgentStatus = "idle" | "working" | "done" | "error";
@@ -39,6 +40,10 @@ export interface LightEvent {
   message?: string;
   timestamp: string;
   usage?: Usage;
+  // True when a tool_use event was detected as a WSL invocation by detectWsl.
+  wsl?: boolean;
+  // The command that runs inside WSL (parsed by detectWsl), for stats.
+  wslCommand?: string;
 }
 
 export interface SessionState {
@@ -53,6 +58,15 @@ export interface SessionState {
   startedAt?: string;
   recent: LightEvent[];
   usage?: Usage;
+  // Live WSL invocation info while the agent is (or last was) running a
+  // `wsl ...` command. Set on a detected wsl tool_use, cleared on the next
+  // non-WSL tool_use / stop / error / prompt.
+  wsl?: WslInfo & {
+    startedAt: string;
+    // Estimated total duration of this command, from historical averages of
+    // the same WSL inner command (undefined = no history yet → no percentage).
+    estimatedTotalMs?: number;
+  };
   // ETA estimate for "working" sessions: seconds until the context window
   // fills at the current token rate, or undefined if we can't estimate.
   // This is a rough heuristic, not a promise — see computeEta().
@@ -129,6 +143,14 @@ export class StateStore extends EventEmitter {
   private sessions = new Map<string, SessionState>();
   private timers = new Map<string, NodeJS.Timeout>();
   private gcTimers = new Map<string, NodeJS.Timeout>();
+  // Injected by main.ts: given a WSL inner command, return its historical
+  // average duration in ms (or undefined when unknown). Lets the pill show an
+  // estimated progress bar for a running `wsl …` command.
+  private wslEstimator: ((command: string) => number | undefined) | null = null;
+
+  setWslEstimator(fn: (command: string) => number | undefined): void {
+    this.wslEstimator = fn;
+  }
   private seqCounters = new Map<AgentId, number>();
   // Per-session rolling list of (timestamp, contextTokens) samples, used to
   // estimate the token-consumption rate for ETA. Capped at RATE_SAMPLES.
@@ -206,6 +228,7 @@ export class StateStore extends EventEmitter {
       case "session_start":
         next.status = "idle";
         next.currentTool = undefined;
+        next.wsl = undefined;
         next.startedAt = undefined;
         next.lastPrompt = undefined;
         // A brand-new session starts with a fresh context — drop any stale
@@ -218,20 +241,41 @@ export class StateStore extends EventEmitter {
         next.startedAt = evt.timestamp;
         next.lastPrompt = evt.message;
         next.currentTool = undefined;
+        next.wsl = undefined;
         this.rateSamples.delete(key); // new turn, reset rate estimate
         break;
-      case "tool_use":
+      case "tool_use": {
         next.status = "working";
         next.currentTool = evt.tool ?? evt.message;
         if (!next.startedAt) next.startedAt = evt.timestamp;
+        const wslInfo = detectWsl(evt.tool, evt.message);
+        if (wslInfo) {
+          // Estimate against the command STEM (first token) so different
+          // argument lists share one history bucket and the pill can show a
+          // meaningful percentage. See wslCommandKey().
+          const stem = wslCommandKey(wslInfo.command) || wslInfo.command;
+          const estimatedTotalMs = this.wslEstimator?.(stem);
+          next.wsl = {
+            ...wslInfo,
+            startedAt: evt.timestamp,
+            estimatedTotalMs,
+          };
+          evt.wsl = true; // mark the event so recent/history can see it
+          evt.wslCommand = wslInfo.command;
+        } else {
+          next.wsl = undefined;
+        }
         break;
+      }
       case "stop":
         next.status = "done";
         next.currentTool = undefined;
+        next.wsl = undefined;
         break;
       case "error":
         next.status = "error";
         next.currentTool = undefined;
+        next.wsl = undefined;
         break;
       case "notification":
         break;
@@ -336,6 +380,8 @@ export class StateStore extends EventEmitter {
         if (noEnd) this.scheduleAutoReset(key);
       }
     }, delay);
+    // Don't keep the process alive purely for these lifecycle timers.
+    if (timer.unref) timer.unref();
     this.timers.set(key, timer);
   }
 
@@ -357,6 +403,7 @@ export class StateStore extends EventEmitter {
         this.emit("state", this.getState());
       }
     }, IDLE_GC_MS);
+    if (t.unref) t.unref();
     this.gcTimers.set(key, t);
   }
 
@@ -412,6 +459,17 @@ export class StateStore extends EventEmitter {
   }
 
   private ensureEtaTimer(): void {
+    // If nothing is working, stop ticking entirely — no need to keep an
+    // interval alive (and it would otherwise block clean process exit in
+    // headless/CLI usage). It gets re-created on the next working event.
+    const anyWorking = [...this.sessions.values()].some((s) => s.status === "working");
+    if (!anyWorking) {
+      if (this.etaTimer) {
+        clearInterval(this.etaTimer);
+        this.etaTimer = null;
+      }
+      return;
+    }
     if (this.etaTimer) return;
     this.etaTimer = setInterval(() => {
       let changed = false;

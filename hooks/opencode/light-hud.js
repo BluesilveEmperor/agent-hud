@@ -222,14 +222,23 @@ export const LightHud = async () => {
     },
 
     // Tool hooks carry the tool name + args directly.
+    //
+    // OpenCode's `tool.execute.before(input, output)` signature puts the
+    // *tool input* (the command the agent is about to run) in the FIRST
+    // argument `input`, while `output` is the result of a PREVIOUS execution
+    // and is undefined at "before" time. We must read the command from
+    // `input`, not `output` — otherwise Bash commands (and therefore WSL
+    // invocations like `wsl python train.py`) are never forwarded to the HUD
+    // and the WSL monitor silently never fires.
     "tool.execute.before": async (input, output) => {
       const tool = pick(input, "tool", "name") || "tool";
       const sid =
         pick(input, "sessionID", "sessionId", "session_id") || lastSessionId;
+      const args = input?.args ?? input?.input;
       await notify("tool_use", {
         sessionId: sid,
         tool: String(tool),
-        message: describeArgs(output?.args ?? output?.input),
+        message: describeArgs(args),
       });
     },
   };

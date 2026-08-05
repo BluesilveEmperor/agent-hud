@@ -47,6 +47,14 @@
 - **磨砂玻璃 UI**：任何壁纸下都清晰，深浅模式透明度完全对齐，均能透出桌面壁纸
 - **马卡龙配色**：柔和马卡龙色系，状态点、光晕、流光色彩统一
 
+### WSL 调用监控（4.0 新增）
+- **实时识别**：agent 发起 `wsl` / `wsl.exe` 命令（含 `-e`、`-d <发行版>`、`bash -c "wsl …"` 等形态）时，胶囊与面板显示青色 `WSL` 徽标 + 发行版 + WSL 内实际命令
+- **进度可视化**：胶囊与面板显示薄荷绿进度条 + 百分比，按该命令的历史平均时长估算（如 `python train.py · 56%`）；新命令首次执行时提示"暂无进度估算"
+- **历史与统计**：每次 WSL 调用记入 `history.jsonl`（含按命令拆分的时长），「统计 · 今日」面板展示各 agent 与全局的 WSL 调用次数、耗时与 Top 命令
+- **完成通知**：跑过 WSL 命令的会话完成/出错时，通知标题带 `WSL` 标记，正文与 webhook 附最近一次 WSL 命令
+- **零侵入**：纯文本级识别命令字符串，不在 WSL 内安装任何脚本、不改 agent 工作流；`wslpath`、`/mnt/wsl/...` 路径与普通文本里的 `wsl` 单词不会误判
+- **全 agent 支持**：Claude Code / Codex / OpenCode / DevEco Code 上报的命令文本都会识别。OpenCode/DevEco 从 `tool.execute.before` 的入参读取命令，Claude/Codex 从 `PreToolUse` 的 `tool_input` 读取（v4.0.1 已修正 OpenCode 取错字段导致 WSL 监控失效的问题）
+
 ### 其他
 - **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code 自动拷贝 plugin
 - **桌面备忘录**：随手记下待办
@@ -92,14 +100,14 @@ npm run dev
 ```bash
 npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
-# → release/AgentHUD-Setup-3.0.0.exe
+# → release/AgentHUD-Setup-4.0.0.exe
 ```
 
 #### macOS
 
 ```bash
 npm run dist:mac      # build + stage + pack-dmg
-# → release/AgentHUD-3.0.0.dmg
+# → release/AgentHUD-4.0.0.dmg
 ```
 
 `pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
@@ -108,12 +116,12 @@ npm run dist:mac      # build + stage + pack-dmg
 
 ```bash
 npm run dist:linux    # build + stage + pack-tarball
-# → release/AgentHUD-3.0.0-linux-x64.tar.gz
+# → release/AgentHUD-4.0.0-linux-x64.tar.gz
 ```
 
 解压后运行：
 ```bash
-tar xzf AgentHUD-3.0.0-linux-x64.tar.gz
+tar xzf AgentHUD-4.0.0-linux-x64.tar.gz
 ./AgentHUD/run.sh
 ```
 
@@ -135,8 +143,8 @@ npx electron-builder --linux  # Linux: AppImage + deb
 仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
 
 ```bash
-git tag v3.0.0
-git push origin v3.0.0
+git tag v4.0.0
+git push origin v4.0.0
 # → Actions 页面查看构建进度，完成后 Release 页面下载安装包
 ```
 

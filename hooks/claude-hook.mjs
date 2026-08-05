@@ -60,6 +60,18 @@ function pickFields(parsed) {
   let message;
   if (typeof parsed.prompt === "string") message = parsed.prompt;
   else if (typeof parsed.message === "string") message = parsed.message;
+  // PreToolUse payloads carry the actual command under tool_input — without
+  // this, the Bash tool's command text (e.g. `wsl python train.py`) never
+  // reaches the HUD, so it can't tell a WSL invocation apart from any other
+  // shell command. prompt/message are absent on PreToolUse, so this branch
+  // only fires for tool_use-shaped payloads.
+  else if (parsed.tool_input && typeof parsed.tool_input === "object") {
+    if (typeof parsed.tool_input.command === "string") {
+      message = parsed.tool_input.command;
+    } else if (typeof parsed.tool_input.description === "string") {
+      message = parsed.tool_input.description;
+    }
+  }
   const transcriptPath =
     typeof parsed.transcript_path === "string" ? parsed.transcript_path : undefined;
   const model =

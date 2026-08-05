@@ -490,6 +490,58 @@ body,
   font-variant-numeric: tabular-nums;
   opacity: 0.72;
 }
+/* WSL invocation badge + inner command on the working chip */
+.wsl-chip {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  background: linear-gradient(135deg, rgba(76, 199, 171, 0.22), rgba(76, 199, 171, 0.08));
+  border: 1px solid rgba(76, 199, 171, 0.45);
+  color: rgba(160, 240, 220, 0.95);
+  text-shadow: 0 0 8px rgba(76, 199, 171, 0.35);
+  white-space: nowrap;
+}
+.chip-wsl-cmd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  opacity: 0.92;
+}
+/* Mini progress bar on the capsule: a 3px teal track that fills as the WSL
+   command runs past its historical average duration. */
+.wsl-progress-mini {
+  flex-shrink: 0;
+  width: 44px;
+}
+.wsl-progress-mini-track {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(76, 199, 171, 0.18);
+  overflow: hidden;
+}
+.wsl-progress-mini-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(76, 199, 171, 0.6), rgba(76, 199, 171, 0.95));
+  box-shadow: 0 0 6px rgba(76, 199, 171, 0.5);
+  transition: width 0.9s linear;
+}
+.wsl-progress-pct {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(160, 240, 220, 0.9);
+  opacity: 0.85;
+}
 
 /* Agent label receives light from the dot — subtle state-tinted text glow
    that matches the dot's color, so text feels "illuminated" by its dot. */
@@ -758,6 +810,77 @@ body,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.evt-wsl {
+  opacity: 1;
+  background: linear-gradient(90deg, rgba(76, 199, 171, 0.10), transparent 65%);
+  border-radius: 6px;
+}
+.evt-wsl .evt-text {
+  opacity: 0.95;
+  font-family: ui-monospace, Consolas, monospace;
+}
+.evt-wsl-tag {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: rgba(76, 199, 171, 0.18);
+  border: 1px solid rgba(76, 199, 171, 0.4);
+  color: rgba(160, 240, 220, 0.95);
+}
+
+.stats-wsl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(160, 240, 220, 0.85);
+}
+.stats-wsl-meta {
+  opacity: 0.75;
+  white-space: nowrap;
+}
+.stats-tool-chip.wsl-cmd {
+  font-family: ui-monospace, Consolas, monospace;
+  background: rgba(76, 199, 171, 0.10);
+  border-color: rgba(76, 199, 171, 0.35);
+}
+
+/* Full-width WSL progress row in the expanded panel's session card */
+.wsl-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.wsl-progress-track {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(76, 199, 171, 0.15);
+  overflow: hidden;
+}
+.wsl-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, rgba(76, 199, 171, 0.55), rgba(76, 199, 171, 0.95));
+  box-shadow: 0 0 8px rgba(76, 199, 171, 0.4);
+  transition: width 0.9s linear;
+}
+.wsl-progress-text {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: rgba(160, 240, 220, 0.85);
+  opacity: 0.85;
 }
 
 .empty {
@@ -1510,6 +1633,25 @@ html.light .chip-time {
 html.light .chip-eta {
   opacity: 0.75;
 }
+html.light .wsl-chip {
+  background: linear-gradient(135deg, rgba(20, 140, 110, 0.16), rgba(20, 140, 110, 0.05));
+  border-color: rgba(20, 140, 110, 0.4);
+  color: rgba(16, 110, 88, 0.95);
+  text-shadow: none;
+}
+html.light .evt-wsl-tag {
+  background: rgba(20, 140, 110, 0.12);
+  border-color: rgba(20, 140, 110, 0.35);
+  color: rgba(16, 110, 88, 0.95);
+}
+html.light .evt-wsl {
+  background: linear-gradient(90deg, rgba(20, 140, 110, 0.08), transparent 65%);
+}
+html.light .stats-wsl { color: rgba(16, 110, 88, 0.9); }
+html.light .wsl-progress-mini-track,
+html.light .wsl-progress-track { background: rgba(20, 140, 110, 0.14); }
+html.light .wsl-progress-pct,
+html.light .wsl-progress-text { color: rgba(16, 110, 88, 0.9); }
 html.light .chip-sep {
   opacity: 0.4;
 }

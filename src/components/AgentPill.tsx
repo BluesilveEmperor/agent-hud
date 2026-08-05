@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import type { AgentId, AgentStatus, SessionState } from "../types";
 import { contextColor, contextLabel, contextRatio, fmtTokens } from "../usage";
@@ -52,6 +52,48 @@ function elapsed(fromIso?: string): string {
   return m < 60 ? `${m}m${s % 60}s` : `${Math.floor(m / 60)}h${m % 60}m`;
 }
 
+// Re-render every `intervalMs` while `active` is true, so the WSL progress bar
+// ticks smoothly instead of jumping only on events/ETA refreshes.
+function useTick(active: boolean, intervalMs = 1000): number {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setTick((x) => x + 1), intervalMs);
+    return () => clearInterval(t);
+  }, [active, intervalMs]);
+  return tick;
+}
+
+interface WslProgress {
+  elapsedMs: number;
+  pct?: number;
+  remainingMs?: number;
+}
+
+// WSL progress from elapsed time vs historical average duration.
+// Returns null when there's no live WSL state; pct/remainingMs undefined when
+// the command has no history yet (show "running" without a percentage).
+function wslProgress(wsl: SessionState["wsl"], nowMs: number): WslProgress | null {
+  if (!wsl) return null;
+  const elapsedMs = Math.max(0, nowMs - new Date(wsl.startedAt).getTime());
+  if (wsl.estimatedTotalMs == null || wsl.estimatedTotalMs <= 0) {
+    return { elapsedMs };
+  }
+  const pct = Math.min(1, elapsedMs / wsl.estimatedTotalMs);
+  return {
+    elapsedMs,
+    pct,
+    remainingMs: Math.max(0, wsl.estimatedTotalMs - elapsedMs),
+  };
+}
+
+function fmtMs(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return m < 60 ? `${m}m${s % 60}s` : `${Math.floor(m / 60)}h${m % 60}m`;
+}
+
 function Check() {
   return (
     <svg className="check" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
@@ -70,6 +112,9 @@ export function AgentPill({ agent, sessions, expanded }: Props) {
   const active = pickActive(sessions);
   const count = sessions.length;
   const workingCount = sessions.filter((s) => s.status === "working").length;
+  // Tick every second while a WSL command is live so its progress bar moves.
+  const tick = useTick(status === "working" && !!active?.wsl);
+  void tick; // the re-render is the point; elapsed/progress read Date.now()
 
   const tool = active?.currentTool;
   const timeText =
@@ -127,6 +172,36 @@ export function AgentPill({ agent, sessions, expanded }: Props) {
   } else if (status === "working") {
     if (expanded && active?.lastPrompt) {
       chip = active.lastPrompt;
+    } else if (active?.wsl) {
+      const prog = wslProgress(active.wsl, Date.now());
+      const pct = prog?.pct != null ? Math.round(prog.pct * 100) : undefined;
+      chip = (
+        <>
+          <span className="wsl-chip" title={active.wsl.distro ? `WSL · ${active.wsl.distro}` : "WSL"}>
+            WSL{active.wsl.distro ? ` · ${active.wsl.distro}` : ""}
+          </span>
+          <span className="chip-wsl-cmd">{active.wsl.command}</span>
+          {prog?.pct != null && (
+            <>
+              <span
+                className="wsl-progress-mini"
+                title={`已运行 ${fmtMs(prog.elapsedMs)} · 预计总时长 ${fmtMs(active.wsl.estimatedTotalMs!)} · 约剩 ${fmtMs(prog.remainingMs!)}`}
+              >
+                <span className="wsl-progress-mini-track">
+                  <span className="wsl-progress-mini-fill" style={{ width: `${pct}%` }} />
+                </span>
+              </span>
+              <span className="wsl-progress-pct">{pct}%</span>
+            </>
+          )}
+          {timeText && (
+            <>
+              <span className="chip-sep">·</span>
+              <span className="chip-time">{timeText}</span>
+            </>
+          )}
+        </>
+      );
     } else {
       chip = (
         <>

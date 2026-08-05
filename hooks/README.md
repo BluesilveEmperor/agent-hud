@@ -150,6 +150,26 @@ Set-Alias opencode 'C:\path\to\AGENT-HUD\hooks\opencode-wrap.cmd'
 Set-Alias deveco-code 'C:\path\to\AGENT-HUD\hooks\deveco-wrap.cmd'
 ```
 
+## 3c. WSL 调用监控（自动识别，无需额外配置）
+
+HUD 会从各 agent 上报的 `tool_use` 命令文本里自动识别 **WSL 调用**
+（`wsl` / `wsl.exe`，含 `-e`、`-d <发行版>`、`--distribution`、`--cd`、`bash -c "wsl …"`
+等形态），无需在 WSL 里安装任何东西，也不改 agent 的工作流：
+
+- **实时**：胶囊与面板在 agent 跑 `wsl …` 命令时显示青色 `WSL` 徽标 +
+  发行版 + WSL 内实际命令（如 `WSL · Ubuntu · python train.py`）
+- **历史**：每次 WSL 调用记入 `history.jsonl`（次数 / WSL 内命令分布 / 耗时）
+- **统计**：「统计 · 今日」面板展示各 agent 与全局的 WSL 调用次数、耗时与 Top 命令
+- **通知**：会话完成 / 出错时，若本轮跑过 WSL 命令，通知标题带 `WSL` 标记，
+  正文与 webhook 附最近一次 WSL 命令
+
+识别是纯文本级的：只解析命令字符串，不执行、不监控 WSL 内部进程。`wslpath`、
+`/mnt/wsl/...` 路径、普通文本里的 `wsl` 单词不会被误判。
+
+> 提示：Claude Code 的 hook 需要能拿到 `PreToolUse` 的 `tool_input.command` 才能识别
+> 命令文本。请使用当前仓库里的 `claude-hook.mjs`（已支持提取 `tool_input`），
+> 并用「一键接入」或手动重装一次以更新旧版本脚本。
+
 ## 4. 自定义环境变量
 
 | 变量 | 默认 | 作用 |
@@ -175,6 +195,10 @@ Invoke-RestMethod -Uri http://127.0.0.1:51789/event -Method POST -Body $body -Co
 
 # OpenCode
 $body = @{ agent = 'opencode'; type = 'tool_use'; tool = 'bash'; message = 'npm test' } | ConvertTo-Json
+Invoke-RestMethod -Uri http://127.0.0.1:51789/event -Method POST -Body $body -ContentType 'application/json'
+
+# WSL 调用（应出现青色 WSL 徽标 + "python train.py"）
+$body = @{ agent = 'claude-code'; type = 'tool_use'; tool = 'Bash'; message = 'wsl -d Ubuntu python train.py --epochs 50' } | ConvertTo-Json
 Invoke-RestMethod -Uri http://127.0.0.1:51789/event -Method POST -Body $body -ContentType 'application/json'
 
 # DevEco Code

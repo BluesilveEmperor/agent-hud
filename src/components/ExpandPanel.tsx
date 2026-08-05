@@ -72,6 +72,9 @@ function statusLine(a: SessionState): string {
     case "idle":
       return "空闲";
     case "working":
+      if (a.wsl) {
+        return `WSL${a.wsl.distro ? ` · ${a.wsl.distro}` : ""} · ${a.wsl.command}`;
+      }
       return a.currentTool ? `工作中 · ${a.currentTool}` : "工作中";
     case "done":
       return "刚完成";
@@ -136,6 +139,7 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
                   </button>
                 </div>
                 <UsageRow usage={a.usage} />
+                <WslProgressRow wsl={a.wsl} />
               </div>
             ))
           )}
@@ -216,9 +220,10 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
               <div className="empty">暂无事件</div>
             ) : (
               allEvents.map((e, i) => (
-                <div className="evt" key={`${e.timestamp}-${i}`}>
+                <div className={`evt${e.wsl ? " evt-wsl" : ""}`} key={`${e.timestamp}-${i}`}>
                   <span className="evt-time">{formatTime(e.timestamp)}</span>
                   <span className="evt-tag">{EVENT_TAG[e.type]}</span>
+                  {e.wsl && <span className="evt-wsl-tag">WSL</span>}
                   <span className="evt-text">
                     {e.tool ?? e.message ?? AGENT_LABEL[e._agent as AgentId]}
                   </span>
@@ -432,6 +437,7 @@ function StatsSection() {
         <span>统计 · 今日</span>
         <span className="section-meta">
           {stats.totalSessions} 会话 · {fmtTok(stats.totalTokens)} tokens · {fmtDur(stats.totalDurationMs)}
+          {stats.totalWslCount > 0 && <> · <span className="evt-wsl-tag">WSL</span>×{stats.totalWslCount}</>}
         </span>
       </div>
       <div className="card">
@@ -456,6 +462,17 @@ function StatsSection() {
               <div className="stats-tools">
                 {a.topTools.slice(0, 4).map((t) => (
                   <span key={t.tool} className="stats-tool-chip">{t.tool} ×{t.count}</span>
+                ))}
+              </div>
+            )}
+            {a.wslCount > 0 && (
+              <div className="stats-wsl">
+                <span className="evt-wsl-tag">WSL</span>
+                <span className="stats-wsl-meta">
+                  {a.wslCount} 次{a.wslDurationMs > 0 ? ` · ${fmtDur(a.wslDurationMs)}` : ""}
+                </span>
+                {a.topWslCommands.slice(0, 3).map((t) => (
+                  <span key={t.tool} className="stats-tool-chip wsl-cmd">{t.tool} ×{t.count}</span>
                 ))}
               </div>
             )}
@@ -533,6 +550,17 @@ function HistorySection() {
                       ))}
                     </div>
                   )}
+                  {r.wslCount > 0 && (
+                    <div className="stats-wsl">
+                      <span className="evt-wsl-tag">WSL</span>
+                      <span className="stats-wsl-meta">
+                        {r.wslCount} 次{r.wslDurationMs > 0 ? ` · ${fmtDur(r.wslDurationMs)}` : ""}
+                      </span>
+                      {Object.entries(r.wslCommands).slice(0, 3).map(([cmd, count]) => (
+                        <span key={cmd} className="stats-tool-chip wsl-cmd">{cmd} ×{count}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -601,6 +629,51 @@ const ITEM: Variants = {
   hidden: { opacity: 0, y: 8 },
   show: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } },
 };
+
+// Live WSL task progress: elapsed time vs the historical average duration of
+// the same command (estimatedTotalMs from StateStore). Ticks every second so
+// the bar moves while the command runs. No history → show "running" without a
+// percentage. Hidden entirely when no WSL command is currently active.
+function WslProgressRow({ wsl }: { wsl?: SessionState["wsl"] }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!wsl) return;
+    const t = setInterval(() => setTick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [wsl]);
+  void tick; // re-render each second is the point
+
+  if (!wsl) return null;
+  const elapsedMs = Math.max(0, Date.now() - new Date(wsl.startedAt).getTime());
+  const total = wsl.estimatedTotalMs;
+
+  if (total == null || total <= 0) {
+    return (
+      <div className="wsl-progress-row">
+        <span className="evt-wsl-tag">WSL</span>
+        <span className="wsl-progress-text">
+          已运行 {formatDuration(wsl.startedAt)} · 首次执行，暂无进度估算
+        </span>
+      </div>
+    );
+  }
+
+  const pct = Math.min(1, elapsedMs / total);
+  const remaining = Math.max(0, total - elapsedMs);
+  const pctText = Math.round(pct * 100);
+  return (
+    <div className="wsl-progress-row">
+      <span className="evt-wsl-tag">WSL</span>
+      <div className="wsl-progress-track" title={`预计总时长 ${fmtDur(total)}`}>
+        <div className="wsl-progress-fill" style={{ width: `${pctText}%` }} />
+      </div>
+      <span className="wsl-progress-text">
+        {pctText}% · 已运行 {formatDuration(wsl.startedAt)} · 预计总 {fmtDur(total)} · 约剩{" "}
+        {fmtDur(remaining)}
+      </span>
+    </div>
+  );
+}
 
 // Token + context usage for one session. Renders a progress bar for the
 // context window fill plus a compact stat line (current/limit, this-turn

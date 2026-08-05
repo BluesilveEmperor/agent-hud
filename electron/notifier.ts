@@ -19,7 +19,7 @@ import path from "node:path";
 import http from "node:http";
 import https from "node:https";
 import { URL } from "node:url";
-import type { AgentId, SessionState, Usage } from "./state";
+import type { AgentId, LightEvent, SessionState, Usage } from "./state";
 
 export interface NotifyConfig {
   osEnabled: boolean;
@@ -112,8 +112,12 @@ export class Notifier {
 
     const label = AGENT_LABEL[session.agent] ?? session.agent;
     const status = session.status === "error" ? "出错" : "完成";
-    const title = `${label} · ${status}`;
+    // If this session ran any WSL command, surface it in the notification so
+    // a long experiment finishing elsewhere still tells you what ran.
+    const wslCmd = lastWslCommand(session.recent);
+    const title = wslCmd ? `${label} · WSL · ${status}` : `${label} · ${status}`;
     const bodyParts: string[] = [];
+    if (wslCmd) bodyParts.push(`WSL ${wslCmd}`);
     if (session.lastPrompt) bodyParts.push(truncate(session.lastPrompt, 60));
     if (durationMs > 0) bodyParts.push(fmtDuration(durationMs));
     if (session.usage?.totalTokens) bodyParts.push(`${fmtTokens(session.usage.totalTokens)} tokens`);
@@ -150,6 +154,7 @@ export class Notifier {
         prompt: session.lastPrompt,
         durationMs,
         usage: session.usage,
+        wsl: wslCmd,
         timestamp: new Date().toISOString(),
       }).catch(() => { /* swallow — webhook failures must never break the app */ });
     }
@@ -209,6 +214,15 @@ export class Notifier {
     }
     return result;
   }
+}
+
+// Newest-first events list → the command of the most recent WSL invocation.
+function lastWslCommand(events: LightEvent[] | undefined): string | undefined {
+  if (!events) return undefined;
+  for (const e of events) {
+    if (e.wsl && e.type === "tool_use") return e.message || e.tool || "wsl";
+  }
+  return undefined;
 }
 
 function truncate(s: string, max: number): string {
