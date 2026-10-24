@@ -13,6 +13,10 @@ import os from "node:os";
 const PORT = Number(process.env.LIGHT_PORT || 51789);
 const HOST = "127.0.0.1";
 const TYPE = process.argv[2];
+// Which agent is reporting: Claude Code by default, or another agent whose
+// hooks use the same payload shape (WorkBuddy → "workbuddy"). Passed as the
+// second argv by the one-click installer, or via LIGHT_AGENT.
+const AGENT = process.argv[3] || process.env.LIGHT_AGENT || "claude-code";
 
 // Debug log so we can see whether Claude is actually invoking us.
 const LOG_PATH = path.join(os.tmpdir(), "light-hook.log");
@@ -228,7 +232,7 @@ async function postWithLog(payload) {
   }
 
   const ok = await postWithLog({
-    agent: "claude-code",
+    agent: AGENT,
     type: TYPE,
     sessionId: fields.sessionId,
     tool: fields.tool,

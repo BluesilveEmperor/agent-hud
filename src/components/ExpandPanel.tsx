@@ -30,6 +30,9 @@ const AGENT_LABEL: Record<AgentId, string> = {
   trae: "Trae",
   opencode: "OpenCode",
   "deveco-code": "DevEco Code",
+  codearts: "CodeArts Agent",
+  workbuddy: "WorkBuddy",
+  hermes: "Hermes",
 };
 
 const EVENT_TAG: Record<LightEvent["type"], string> = {
@@ -242,6 +245,9 @@ const HOOK_AGENTS: { key: HookAgentKey; label: string }[] = [
   { key: "codex", label: "Codex" },
   { key: "opencode", label: "OpenCode" },
   { key: "deveco", label: "DevEco Code" },
+  { key: "codearts", label: "CodeArts Agent" },
+  { key: "workbuddy", label: "WorkBuddy" },
+  { key: "hermes", label: "Hermes" },
 ];
 
 // In-app one-click hook setup. Light can only *receive* events, so each agent
@@ -249,7 +255,9 @@ const HOOK_AGENTS: { key: HookAgentKey; label: string }[] = [
 // safely (never overwrites the user's other settings).
 function HooksSection() {
   const [status, setStatus] = useState<HooksStatus | null>(null);
-  const [busy, setBusy] = useState<HookAgentKey | "all" | null>(null);
+  const [busy, setBusy] = useState<{ agent: HookAgentKey | "all"; op: "install" | "uninstall" } | null>(
+    null,
+  );
   const [note, setNote] = useState<string>("");
 
   const refresh = () => {
@@ -259,7 +267,7 @@ function HooksSection() {
 
   const install = async (agent: HookAgentKey | "all") => {
     if (!window.light?.installHooks || busy) return;
-    setBusy(agent);
+    setBusy({ agent, op: "install" });
     setNote("");
     try {
       const res = await window.light.installHooks(agent);
@@ -272,11 +280,29 @@ function HooksSection() {
     }
   };
 
+  const uninstall = async (agent: HookAgentKey) => {
+    if (!window.light?.uninstallHooks || busy) return;
+    setBusy({ agent, op: "uninstall" });
+    setNote("");
+    try {
+      const res = await window.light.uninstallHooks(agent);
+      setStatus(res.status);
+      setNote(res.message);
+    } catch {
+      setNote("取消接入失败，请重试");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const allInstalled =
     !!status?.claude.installed &&
     !!status?.codex.installed &&
     !!status?.opencode.installed &&
-    !!status?.deveco.installed;
+    !!status?.deveco.installed &&
+    !!status?.codearts.installed &&
+    !!status?.workbuddy.installed &&
+    !!status?.hermes.installed;
 
   return (
     <>
@@ -287,7 +313,7 @@ function HooksSection() {
           onClick={() => install("all")}
           disabled={!status?.ready || busy !== null || allInstalled}
         >
-          {allInstalled ? "已全部接入" : busy === "all" ? "接入中…" : "一键接入"}
+          {allInstalled ? "已全部接入" : busy?.op === "install" && busy.agent === "all" ? "接入中…" : "一键接入"}
         </button>
       </div>
       <div className="card">
@@ -301,6 +327,7 @@ function HooksSection() {
             const state = st.installed ? "ok" : st.needsUpdate ? "warn" : "off";
             const stateText =
               state === "ok" ? "已接入" : state === "warn" ? "需更新路径" : "未接入";
+            const rowBusy = busy?.agent === key ? busy.op : null;
             return (
               <div key={key} className="panel-row hook-row">
                 <span className={`hook-dot ${state}`} />
@@ -311,8 +338,18 @@ function HooksSection() {
                   onClick={() => install(key)}
                   disabled={busy !== null || st.installed}
                 >
-                  {busy === key ? "…" : st.installed ? "✓" : st.needsUpdate ? "更新" : "接入"}
+                  {rowBusy === "install" ? "…" : st.installed ? "✓" : st.needsUpdate ? "更新" : "接入"}
                 </button>
+                {(st.installed || st.needsUpdate) && (
+                  <button
+                    className="hook-btn danger"
+                    title={`取消 ${label} 的接入（只移除本应用写入的 hooks/插件）`}
+                    onClick={() => uninstall(key)}
+                    disabled={busy !== null}
+                  >
+                    {rowBusy === "uninstall" ? "…" : "取消"}
+                  </button>
+                )}
               </div>
             );
           })

@@ -40,3 +40,9 @@ bridge/diag*.ps1
 
 # electron-builder output (separate from our hand-staged release/)
 release/electron-builder/
+
+# Local agent memory / workspace data (per-user, private notes)
+.workbuddy/
+
+# Backup copies made before rewriting user configs
+*.bak

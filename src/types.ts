@@ -1,4 +1,12 @@
-export type AgentId = "claude-code" | "codex" | "trae" | "opencode" | "deveco-code";
+export type AgentId =
+  | "claude-code"
+  | "codex"
+  | "trae"
+  | "opencode"
+  | "deveco-code"
+  | "codearts"
+  | "workbuddy"
+  | "hermes";
 
 export type AgentStatus = "idle" | "working" | "done" | "error";
 
@@ -92,7 +100,14 @@ export interface HotZone {
   h: number;
 }
 
-export type HookAgentKey = "claude" | "codex" | "opencode" | "deveco";
+export type HookAgentKey =
+  | "claude"
+  | "codex"
+  | "opencode"
+  | "deveco"
+  | "codearts"
+  | "workbuddy"
+  | "hermes";
 
 export interface AgentHookStatus {
   agent: HookAgentKey;
@@ -109,6 +124,9 @@ export interface HooksStatus {
   codex: AgentHookStatus;
   opencode: AgentHookStatus;
   deveco: AgentHookStatus;
+  codearts: AgentHookStatus;
+  workbuddy: AgentHookStatus;
+  hermes: AgentHookStatus;
 }
 
 export interface HooksInstallResult {
@@ -217,6 +235,7 @@ declare global {
       removeSession: (key: string) => void;
       getHooksStatus: () => Promise<HooksStatus>;
       installHooks: (agent: HookAgentKey | "all") => Promise<HooksInstallResult>;
+      uninstallHooks: (agent: HookAgentKey | "all") => Promise<HooksInstallResult>;
       getHistory: (q?: HistoryQuery) => Promise<SessionRecord[]>;
       getStats: (opts?: { since?: string; until?: string }) => Promise<Stats | null>;
       getNotifyConfig: () => Promise<NotifyConfig>;

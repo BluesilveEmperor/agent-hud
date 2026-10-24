@@ -1,17 +1,17 @@
 # AGENT HUD · 桌面状态胶囊
 
-> 屏幕常驻的悬浮胶囊，实时展示 **Claude Code / Codex / OpenCode / DevEco Code** 的工作状态、token 用量与上下文占用。
+> 屏幕常驻的悬浮胶囊，实时展示 **Claude Code / Codex / OpenCode / DevEco Code / CodeArts Agent / WorkBuddy** 的工作状态、token 用量与上下文占用。
 > 磨砂玻璃质感 + 双边流光 + 点光源效果，余光一瞥就知道 AI 在干活、做完了还是出错了，不用切窗口。
 
 基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换、HarmonyOS 风格视效、WSL 调用监控等功能。
 
-当前版本 **4.1.0**。
+当前版本 **0.4.3**。
 
 ## 功能一览
 
 ### 状态展示
 - **状态一目了然**：工作中泛蓝光呼吸、完成变绿打勾、出错变红抖动，显示当前工具与用时
-- **多会话 / 多 agent**：Claude Code、Codex、OpenCode、DevEco Code 同时跑也能分栏显示
+- **多会话 / 多 agent**：Claude Code、Codex、OpenCode、DevEco Code、CodeArts Agent、WorkBuddy 同时跑也能分栏显示
 - **可拖动胶囊**：按住胶囊边缘空白处即可拖到屏幕任意位置，点击内容区展开/收起面板
 
 ### HarmonyOS 风格视效（3.0 新增）
@@ -59,7 +59,7 @@
 - **马卡龙配色**：柔和马卡龙色系，状态点、光晕、流光色彩统一
 
 ### 其他
-- **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code 自动拷贝 plugin
+- **一键接入**：app 内一键接入全部 agent——Claude/Codex 安全合并 hooks 配置，OpenCode/DevEco Code/CodeArts Agent 自动拷贝 plugin
 - **桌面备忘录**：随手记下待办
 - **媒体控制**：显示当前播放的音乐，左侧展示来源媒体应用的应用图标（自动提取），可上一首/下一首/暂停（仅 Windows SMTC）
 - **纯本地**：只监听 `127.0.0.1`，不联网、不上传任何数据
@@ -115,14 +115,14 @@ npm run dev:web    # 在浏览器打开 http://localhost:5173
 ```bash
 npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
-# → release/AgentHUD-Setup-4.1.0.exe
+# → release/AgentHUD-Setup-0.4.3.exe
 ```
 
 #### macOS
 
 ```bash
 npm run dist:mac      # build + stage + pack-dmg
-# → release/AgentHUD-4.1.0.dmg
+# → release/AgentHUD-0.4.3.dmg
 ```
 
 `pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
@@ -131,12 +131,12 @@ npm run dist:mac      # build + stage + pack-dmg
 
 ```bash
 npm run dist:linux    # build + stage + pack-tarball
-# → release/AgentHUD-4.1.0-linux-x64.tar.gz
+# → release/AgentHUD-0.4.3-linux-x64.tar.gz
 ```
 
 解压后运行：
 ```bash
-tar xzf AgentHUD-4.1.0-linux-x64.tar.gz
+tar xzf AgentHUD-0.4.3-linux-x64.tar.gz
 ./AgentHUD/run.sh
 ```
 
@@ -160,8 +160,8 @@ npx electron-builder --linux  # Linux: AppImage + deb
 仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
 
 ```bash
-git tag v4.1.0
-git push origin v4.1.0
+git tag v0.4.3
+git push origin v0.4.3
 # → Actions 页面查看构建进度，完成后 Release 页面下载安装包
 ```
 
@@ -190,7 +190,7 @@ CI 流程：
 
 ## 接入 Agent
 
-**最简单的方式：** 展开胶囊面板 →「接入 Agent」→「一键接入」，自动配置全部四个 agent。或右键托盘 →「一键接入全部 Agent」。
+**最简单的方式：** 展开胶囊面板 →「接入 Agent」→「一键接入」，自动配置全部已支持的 agent。或右键托盘 →「一键接入全部 Agent」。
 
 | Agent | 接入方式 | 写入位置 |
 |---|---|---|
@@ -198,8 +198,14 @@ CI 流程：
 | Codex | 合并 hooks JSON | `~/.codex/hooks.json` |
 | OpenCode | 拷贝 plugin | `~/.config/opencode/plugins/light-hud.js` |
 | DevEco Code | 拷贝 plugin | `~/.config/deveco/plugins/light-hud.js` |
+| CodeArts Agent | 拷贝 plugin | `~/.codeartsdoer/plugins/light-hud.js` |
+| WorkBuddy | 合并 hooks JSON | `~/.workbuddy/settings.json` |
 
 全程保留已有配置、不覆盖、先写 `.light-backup` 备份。接入后重启对应 agent 即可生效。手动配置方式见 [hooks/README.md](hooks/README.md)。
+
+**单独取消某个 agent：** 面板里每个已接入的 agent 右侧都有「取消」按钮，只移除**本应用写入的**那部分——
+hooks JSON 里按脚本名精确摘除（其它 hook、其它配置一个不动），plugin 模式把 `light-hud.js` 改名为
+`.light-backup`（不再加载但可随时恢复）。用户自己写的同名插件（无本应用标记）会被识别并跳过，不会误删。
 
 ## 目录结构
 

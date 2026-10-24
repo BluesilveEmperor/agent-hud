@@ -45,6 +45,9 @@ const AGENT_LABEL: Record<AgentId, string> = {
   trae: "Trae",
   opencode: "OpenCode",
   "deveco-code": "DevEco Code",
+  codearts: "CodeArts Agent",
+  workbuddy: "WorkBuddy",
+  hermes: "Hermes",
 };
 
 export class Notifier {

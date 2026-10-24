@@ -9,6 +9,9 @@ const AGENT_SHORT: Record<AgentId, string> = {
   trae: "Trae",
   opencode: "OpenCode",
   "deveco-code": "DevEco",
+  codearts: "CodeArts",
+  workbuddy: "WorkBuddy",
+  hermes: "Hermes",
 };
 const AGENT_FULL: Record<AgentId, string> = {
   "claude-code": "Claude Code",
@@ -16,6 +19,9 @@ const AGENT_FULL: Record<AgentId, string> = {
   trae: "Trae",
   opencode: "OpenCode",
   "deveco-code": "DevEco Code",
+  codearts: "CodeArts Agent",
+  workbuddy: "WorkBuddy",
+  hermes: "Hermes",
 };
 
 interface Props {

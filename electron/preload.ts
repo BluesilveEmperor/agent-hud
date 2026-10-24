@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld("light", {
   removeSession: (key: string) => ipcRenderer.send("light:remove-session", key),
   getHooksStatus: () => ipcRenderer.invoke("light:get-hooks-status"),
   installHooks: (agent: string) => ipcRenderer.invoke("light:install-hooks", agent),
+  uninstallHooks: (agent: string) => ipcRenderer.invoke("light:uninstall-hooks", agent),
   getHistory: (q: unknown) => ipcRenderer.invoke("light:get-history", q),
   getStats: (opts: unknown) => ipcRenderer.invoke("light:get-stats", opts),
   getNotifyConfig: () => ipcRenderer.invoke("light:get-notify-config"),

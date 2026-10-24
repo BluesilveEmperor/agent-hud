@@ -1,12 +1,14 @@
-# OpenCode / DevEco Code 接入说明
+# OpenCode / DevEco Code / CodeArts Agent 接入说明
 
 AGENT HUD（基于 Light）通过本地 HTTP 服务（`127.0.0.1:51789`）接收状态事件。
-OpenCode 与 DevEco Code（基于 OpenCode 定制）共用同一套 **plugin 事件钩子**机制，
-因此用同一个插件文件 `light-hud.js` 即可接入两者。
+OpenCode、DevEco Code 与华为云 CodeArts Agent（码道，含 CLI 与 IDE，均为 OpenCode
+分支）共用同一套 **plugin 事件钩子**机制，因此用同一个插件文件 `light-hud.js`
+即可接入三者。
 
 > **最省事：用 app 内的一键接入。** 展开胶囊面板 →「接入 Agent」→ 分别点
-> OpenCode / DevEco Code 的「接入」按钮。它会把这个插件**拷贝**到
-> `~/.config/opencode/plugins/` 或 `~/.config/deveco/plugins/`（自动建目录），
+> OpenCode / DevEco Code / CodeArts Agent 的「接入」按钮。它会把这个插件**拷贝**到
+> `~/.config/opencode/plugins/`、`~/.config/deveco/plugins/` 或
+> `~/.codeartsdoer/plugins/`（自动建目录），
 > 已有同名文件会被 `.light-backup` 备份。下面的手动步骤只在你想自己管理时才需要。
 
 ## 工作原理
@@ -25,8 +27,9 @@ OpenCode 与 DevEco Code（基于 OpenCode 定制）共用同一套 **plugin 事
 插件会根据**安装路径**自动判断上报身份：
 - 装在 `…/opencode/plugins/` → 上报 `opencode`
 - 装在 `…/deveco/plugins/` → 上报 `deveco-code`
+- 装在 `…/.codeartsdoer/plugins/` → 上报 `codearts`
 
-也可用环境变量 `LIGHT_AGENT=opencode|deveco-code` 强制指定。
+也可用环境变量 `LIGHT_AGENT=opencode|deveco-code|codearts` 强制指定。
 
 ## 手动安装
 

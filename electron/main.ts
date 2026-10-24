@@ -6,7 +6,7 @@ import { DEFAULT_PORT, startServer } from "./server";
 import { MemoStore, type Memo } from "./memos";
 import { SystemStore, type SystemState } from "./system";
 import { WinBridge, type MediaAction } from "./winbridge";
-import { getHooksStatus, installHooks, type InstallTarget } from "./hooks-setup";
+import { getHooksStatus, installHooks, uninstallHooks, type InstallTarget } from "./hooks-setup";
 import { HistoryStore, type HistoryQuery, type SessionRecord } from "./history";
 import { Notifier, type NotifyConfig } from "./notifier";
 import { ThemeStore, type Theme, type EffectiveTheme } from "./theme";
@@ -28,6 +28,10 @@ let cursorTimer: NodeJS.Timeout | null = null;
 let currentlyIgnoring = true;
 let hotZones: HotZone[] = [];
 let lastHoverSent: boolean | null = null;
+// Delayed focus release: when the HUD goes click-through we must also give up
+// OS focus, otherwise Windows keeps the whole (mostly invisible) window rect
+// hit-testable and it silently swallows every click beneath it.
+let pendingBlurTimer: NodeJS.Timeout | null = null;
 
 const store = new StateStore();
 const systemStore = new SystemStore();
@@ -122,6 +126,34 @@ function createWindow(): void {
   });
 }
 
+// Windows quirk: once this window holds focus (e.g. the user clicked the pill
+// to open the panel), calling setIgnoreMouseEvents(true) is NOT enough — the
+// focused window stays hit-testable across its entire 640×520 rect, so every
+// click on the invisible area below the capsule lands on the HUD instead of
+// the app underneath. And because those clicks hit an already-focused window,
+// no blur ever fires and the blockage persists until Alt-Tab. The fix: when
+// going click-through, release focus too. We delay it ~450ms so briefly
+// sliding off the pill doesn't yank the panel shut mid-motion; if the cursor
+// re-enters a hot zone first, the timer is cancelled.
+function releaseFocusSoon(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!mainWindow.isFocused()) return;
+  if (pendingBlurTimer) return;
+  pendingBlurTimer = setTimeout(() => {
+    pendingBlurTimer = null;
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) {
+      mainWindow.blur();
+    }
+  }, 450);
+}
+
+function cancelPendingBlur(): void {
+  if (pendingBlurTimer) {
+    clearTimeout(pendingBlurTimer);
+    pendingBlurTimer = null;
+  }
+}
+
 function setIgnore(ignore: boolean): void {
   if (!mainWindow) return;
   if (ignore === currentlyIgnoring) return;
@@ -133,7 +165,9 @@ function setIgnore(ignore: boolean): void {
   // so clicks pass through cleanly to whatever is underneath.
   if (ignore) {
     mainWindow.setIgnoreMouseEvents(true);
+    releaseFocusSoon();
   } else {
+    cancelPendingBlur();
     mainWindow.setIgnoreMouseEvents(false);
   }
   currentlyIgnoring = ignore;
@@ -152,6 +186,12 @@ function startCursorPoll(): void {
     );
     setIgnore(!overHotZone);
 
+    // Safety net: a focused HUD window is a click-eating window on Windows,
+    // regardless of the ignore state (setIgnoreMouseEvents alone won't undo
+    // it). Any time the cursor is outside the hot zones and we somehow still
+    // hold focus, give it back.
+    if (!overHotZone) releaseFocusSoon();
+
     // Authoritative hover signal. DOM mouseenter/leave are unreliable while the
     // window is click-through (the OS stops delivering events once the cursor
     // leaves a hot zone, so the renderer's `mouseleave` may never fire and the
@@ -168,6 +208,7 @@ function stopCursorPoll(): void {
   if (cursorTimer) clearInterval(cursorTimer);
   cursorTimer = null;
   lastHoverSent = null;
+  cancelPendingBlur();
 }
 
 function buildTrayIcon(): Electron.NativeImage {
@@ -365,11 +406,29 @@ function wireIpc(): void {
       "codex",
       "opencode",
       "deveco",
+      "codearts",
+      "workbuddy",
+      "hermes",
       "all",
       "both",
     ];
     const target: InstallTarget = valid.includes(agent) ? agent : "all";
     return installHooks(target);
+  });
+  ipcMain.handle("light:uninstall-hooks", (_evt, agent: InstallTarget) => {
+    const valid: InstallTarget[] = [
+      "claude",
+      "codex",
+      "opencode",
+      "deveco",
+      "codearts",
+      "workbuddy",
+      "hermes",
+      "all",
+      "both",
+    ];
+    const target: InstallTarget = valid.includes(agent) ? agent : "all";
+    return uninstallHooks(target);
   });
 
   // History & stats

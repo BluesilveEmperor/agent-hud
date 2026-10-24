@@ -1,7 +1,15 @@
 import { EventEmitter } from "node:events";
 import { detectWsl, wslCommandKey, type WslInfo } from "./wsl";
 
-export type AgentId = "claude-code" | "codex" | "trae" | "opencode" | "deveco-code";
+export type AgentId =
+  | "claude-code"
+  | "codex"
+  | "trae"
+  | "opencode"
+  | "deveco-code"
+  | "codearts"
+  | "workbuddy"
+  | "hermes";
 export type AgentStatus = "idle" | "working" | "done" | "error";
 export type EventType =
   | "session_start"
@@ -98,6 +106,7 @@ const AGENTS_WITHOUT_SESSION_END = new Set<AgentId>([
   "codex",
   "opencode",
   "deveco-code",
+  "codearts",
 ]);
 
 const VALID_AGENTS = new Set<AgentId>([
@@ -106,6 +115,9 @@ const VALID_AGENTS = new Set<AgentId>([
   "trae",
   "opencode",
   "deveco-code",
+  "codearts",
+  "workbuddy",
+  "hermes",
 ]);
 const VALID_TYPES = new Set<EventType>([
   "session_start",

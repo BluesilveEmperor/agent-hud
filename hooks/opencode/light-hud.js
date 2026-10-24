@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * AGENT HUD plugin for OpenCode / DevEco Code.
+ * AGENT HUD plugin for OpenCode / DevEco Code / CodeArts Agent.
  *
  * OpenCode exposes a plugin event system (session.* / tool.execute.* /
  * message.* events). DevEco Code is built on top of OpenCode, so the same
@@ -13,6 +13,7 @@
  * installed:
  *   ~/.config/opencode/plugins/light-hud.js   ->  "opencode"
  *   ~/.config/deveco/plugins/light-hud.js      ->  "deveco-code"
+ *   ~/.codeartsdoer/plugins/light-hud.js       ->  "codearts"
  * Override with the LIGHT_AGENT env var if auto-detection misfires.
  *
  * Install: copy this file into the plugins directory above (or use the HUD's
@@ -33,12 +34,15 @@ const HOST = "127.0.0.1";
 const ENDPOINT = `http://${HOST}:${PORT}/event`;
 
 // Auto-detect agent identity from the install path (a deveco plugins dir ->
-// deveco-code), with an env override for edge cases.
-const AGENT =
-  process.env.LIGHT_AGENT ||
-  (String(import.meta.url).toLowerCase().includes("deveco")
-    ? "deveco-code"
-    : "opencode");
+// deveco-code, a codeartsdoer plugins dir -> codearts), with an env override
+// for edge cases.
+function detectAgent() {
+  const where = String(import.meta.url).toLowerCase();
+  if (where.includes("codeartsdoer") || where.includes("codearts")) return "codearts";
+  if (where.includes("deveco")) return "deveco-code";
+  return "opencode";
+}
+const AGENT = process.env.LIGHT_AGENT || detectAgent();
 
 // Last seen session id — tool hooks don't always carry one, so we fall back
 // to this so tool_use events land in the same HUD session as the prompt.
@@ -65,13 +69,16 @@ function pickSessionId(event) {
 
 function pickRole(event) {
   const p = event?.properties ?? event ?? {};
-  const msg = p.message ?? p.info?.message ?? p;
-  return pick(msg, "role") || pick(p, "role");
+  const msg = p.message ?? p.info?.message ?? p.info ?? p;
+  // OpenCode/CodeArts put the message record under properties.info, so the
+  // role lives at info.role — p.role only exists in flattened payloads.
+  return pick(msg, "role") || pick(p?.info, "role") || pick(p, "role");
 }
 
 function pickMessageText(event) {
   const p = event?.properties ?? event ?? {};
-  const msg = p.message ?? p.info?.message ?? p;
+  // properties.info is where OpenCode/CodeArts put the message record.
+  const msg = p.message ?? p.info?.message ?? p.info ?? p;
   if (typeof msg === "string") return msg.slice(0, 200);
   if (typeof msg.text === "string") return msg.text.slice(0, 200);
   const parts = msg.parts ?? msg.content;

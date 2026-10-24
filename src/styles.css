@@ -78,6 +78,7 @@ body,
   justify-content: center;
   align-items: flex-start;
   padding-top: 10px;
+  pointer-events: none;
 }
 
 .stage {
@@ -990,6 +991,20 @@ body,
   opacity: 0.4;
   cursor: default;
 }
+/* "取消接入" sits right next to the install button, so it must not inherit
+   the auto push-right margin of the first button. */
+.hook-btn.danger {
+  margin-left: 6px;
+  padding: 4px 9px;
+  background: rgba(255, 110, 120, 0.14);
+  border-color: rgba(255, 110, 120, 0.28);
+  color: rgba(255, 174, 180, 0.95);
+  font-weight: 500;
+}
+.hook-btn.danger:hover:not(:disabled) {
+  background: rgba(255, 110, 120, 0.26);
+  border-color: rgba(255, 110, 120, 0.55);
+}
 .hook-note {
   font-size: 11px;
   line-height: 1.5;
@@ -1790,6 +1805,15 @@ html.light .hook-btn:hover:not(:disabled) {
 }
 html.light .hook-btn:disabled {
   opacity: 0.4;
+}
+html.light .hook-btn.danger {
+  background: rgba(214, 61, 76, 0.1);
+  border-color: rgba(214, 61, 76, 0.24);
+  color: rgba(178, 43, 56, 0.92);
+}
+html.light .hook-btn.danger:hover:not(:disabled) {
+  background: rgba(214, 61, 76, 0.18);
+  border-color: rgba(214, 61, 76, 0.45);
 }
 /* Hook note text — opacity matched to dark mode. */
 html.light .hook-note {
