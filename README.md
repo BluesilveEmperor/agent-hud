@@ -7,6 +7,17 @@
 
 当前版本 **4.0.0**。
 
+<p align="center">
+  <img src="docs/screenshots/panel.png" width="380" alt="展开面板：多 agent 状态、token 用量、一键接入" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/capsule-working.png" width="46%" alt="工作中：显示当前工具与用时" />
+  <img src="docs/screenshots/capsule-idle.png" width="46%" alt="空闲：只显示 agent 名" />
+</p>
+
+<p align="center"><sub>界面示意，数据来自内置演示模式（<code>npm run dev:web</code> 后访问 <code>?mock=multi</code>）</sub></p>
+
 ## 功能一览
 
 ### 状态展示
@@ -30,7 +41,7 @@
 - **完成预测 ETA**：根据 token 消耗速率估算"上下文还需多久填满"，显示在胶囊上（如 `⏳~4m`）
 - **数据来源**：Claude Code 解析 transcript jsonl 获取真实 usage；OpenCode/DevEco 从 message API 读取
 
-### WSL 调用监控（4.0 新增，4.1 完善）
+### WSL 调用监控（4.0 新增）
 - **实时识别**：agent 发起 `wsl` / `wsl.exe` 命令（含 `-e`、`-d <发行版>`、`bash -c "wsl …"` 等形态）时，胶囊与面板显示青色 `WSL` 徽标 + 发行版 + WSL 内实际命令
 - **进度可视化**：胶囊与面板显示薄荷绿进度条 + 百分比，按该命令的历史平均时长估算（如 `python train.py · 56%`）；新命令首次执行时提示"暂无进度估算"
 - **历史与统计**：每次 WSL 调用记入 `history.jsonl`（含按命令拆分的时长），「统计 · 今日」面板展示各 agent 与全局的 WSL 调用次数、耗时与 Top 命令
