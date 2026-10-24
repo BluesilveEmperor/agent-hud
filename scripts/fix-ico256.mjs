@@ -144,7 +144,24 @@ function crc32(buf) {
 }
 
 // ---- main ----
+// Idempotent: installer/light.ico already ships a 256×256 entry (as BMP-in-ICO
+// since 0.4.4), so there is nothing to synthesise. Bail out instead of failing
+// the CI build — this script only exists for the legacy PNG-in-ICO file.
+const has256 = entries.some((e) => e.w >= 256 && e.h >= 256);
+if (has256) {
+  console.log(`${file}: already has a 256x256 entry (${entries.length} entries) — nothing to do`);
+  process.exit(0);
+}
+
 const srcEntry = entries.reduce((a, b) => (a.w > b.w ? a : b));
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+if (!srcEntry.data.subarray(0, 8).equals(PNG_SIG)) {
+  console.error(
+    `${file}: largest entry (${srcEntry.w}x${srcEntry.h}) is BMP-in-ICO, not PNG — ` +
+      `cannot synthesise a 256 entry. Provide an .ico that already contains 256x256.`,
+  );
+  process.exit(1);
+}
 const img = decodePng(srcEntry.data);
 const up = upscale(img.data, img.width, img.height, 256, 256);
 const png256 = encodePng(up, 256, 256);
