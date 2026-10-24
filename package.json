@@ -1,6 +1,6 @@
 {
   "name": "agent-hud",
-  "version": "4.1.0",
+  "version": "0.4.4",
   "private": true,
   "description": "桌面状态胶囊 · 实时显示 Claude Code / Codex / OpenCode / DevEco Code 的工作状态、token 用量与上下文占用",
   "author": "AgentHUD",

@@ -7,11 +7,11 @@
 ;                             → produces ..\release\AgentHUD\
 ;    2) iscc installer\light.iss
 ;
-; Output:  ..\release\AgentHUD-Setup-4.1.0.exe   (per-user, no admin needed)
+; Output:  ..\release\AgentHUD-Setup-0.4.4.exe   (per-user, no admin needed)
 ; ============================================================================
 
 #define MyAppName "AgentHUD"
-#define MyAppVersion "4.1.0"
+#define MyAppVersion "0.4.4"
 #define MyAppPublisher "AgentHUD"
 #define MyAppExeName "AgentHUD.exe"
 
@@ -22,7 +22,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion=4.1.0.0
+VersionInfoVersion=0.4.3.0
 VersionInfoProductName={#MyAppName}
 
 ; Per-user install → no UAC prompt, lands in %LocalAppData%\Programs\AgentHUD.
@@ -47,7 +47,9 @@ Compression=lzma2/ultra
 SolidCompression=yes
 
 [Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+; Official Simplified Chinese messages (Inno 6.5.0+), vendored next to this
+; script so the build does not depend on the local Inno install's Languages/.
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加任务："

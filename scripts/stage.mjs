@@ -35,7 +35,28 @@ const die = (m) => {
   process.exit(1);
 };
 
-function rmrf(p) { fs.rmSync(p, { recursive: true, force: true }); }
+function rmrf(p) {
+  // Windows AV / indexer / security daemons sometimes hold a freshly-copied
+  // file open WITHOUT delete-share (EBUSY on unlink) while still allowing
+  // read/write. Deleting everything else still works in that case, so retry
+  // briefly and then fall back to a best-effort empty: the straggler stays
+  // in place and gets content-overwritten by cpSync later anyway.
+  for (let i = 0; i < 5; i++) {
+    try {
+      fs.rmSync(p, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (e.code !== "EBUSY" && e.code !== "EPERM") throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);
+    }
+  }
+  try {
+    fs.rmSync(p, { recursive: true, force: true });
+    return;
+  } catch {
+    log(`WARN: ${path.relative(root, p)} 被占用无法删除，保留原文件并继续（内容会被覆盖）`);
+  }
+}
 function copyDir(src, dest) { fs.cpSync(src, dest, { recursive: true }); }
 
 // ---- resolve electron binary location per platform ------------------------
