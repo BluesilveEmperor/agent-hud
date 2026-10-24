@@ -9,12 +9,18 @@ on:
 permissions:
   contents: write
 
+# One release at a time; a second tag push must not interleave artifacts.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ──────────────────────────────────────────────────────────────────────
   # Windows — build staged app + Inno Setup installer
   # ──────────────────────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -50,8 +56,12 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   # macOS — build .app + pack into .dmg
   # ──────────────────────────────────────────────────────────────────────
+  # Sequential on purpose: each platform is verified before the next starts, so
+  # a broken stage script never wastes three runners or half-publishes a release.
   build-macos:
+    needs: build-windows
     runs-on: macos-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +86,9 @@ jobs:
   # Linux — build staged app + tarball
   # ──────────────────────────────────────────────────────────────────────
   build-linux:
+    needs: build-macos
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
