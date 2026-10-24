@@ -492,6 +492,7 @@ export function installMockBridge(): void {
     onTheme: () => () => {},
     onHistoryUpdated: () => () => {},
     setHotZones: () => {},
+    setInputBusy: () => {},
     quit: () => {},
   };
 

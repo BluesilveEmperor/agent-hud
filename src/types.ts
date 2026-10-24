@@ -247,6 +247,8 @@ declare global {
       onHistoryUpdated: (cb: () => void) => () => void;
       mediaControl: (action: MediaAction) => void;
       setHotZones: (zones: HotZone[]) => void;
+      // Input lease for the click-through poll (see electron/main.ts).
+      setInputBusy: (busy: { pointer: boolean; focus: boolean }) => void;
       quit: () => void;
     };
   }

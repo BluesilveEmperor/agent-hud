@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { AgentId, AgentStatus, HotZone, Memo, SessionState, SystemState } from "../types";
 import { AgentPill } from "./AgentPill";
 import { ExpandPanel } from "./ExpandPanel";
 import { MediaCompact } from "./MediaCard";
+import { ConfirmContext, ConfirmDialog, useConfirmState } from "./ConfirmDialog";
 
 interface Props {
   sessions: SessionState[];
@@ -74,18 +75,88 @@ export function Island({ sessions, memos, system }: Props) {
   // Auto-collapse the panel a beat after the cursor leaves the island+panel
   // hot zone — the reliable replacement for "click outside to dismiss" (the
   // window never takes focus, so outside clicks can't blur it). Staying inside
-  // keeps it open; returning cancels the close.
+  // keeps it open; returning cancels the close. A held input lease (mouse
+  // pressed, or a text input focused) also counts as "staying": both mean the
+  // user is mid-interaction and the panel must not collapse under them.
+  const busyRef = useRef({ pointer: false, focus: false });
+  const [busyTick, setBusyTick] = useState(0);
   useEffect(() => {
-    if (!open || hover) return;
+    if (!open || hover || busyTick < 0) return;
+    if (busyRef.current.pointer || busyRef.current.focus) return;
     const t = setTimeout(() => setOpen(false), 1500);
     return () => clearTimeout(t);
-  }, [open, hover]);
+  }, [open, hover, busyTick]);
+
+  // Report the input lease to the main process (dedup: only on change).
+  //   pointer — any mouse button held anywhere: the poll must not flip the
+  //     window click-through mid-press, or the pending pointerup is swallowed.
+  //   focus — a text input has keyboard focus: the poll must not steal focus
+  //     (delayed blur → panel collapses → memo draft lost) while the cursor
+  //     wanders outside the hot zones without the user clicking another app.
+  const reportBusy = useCallback(() => {
+    window.light?.setInputBusy({ ...busyRef.current });
+    setBusyTick((n) => n + 1); // re-run the auto-collapse guard above
+  }, []);
+  useEffect(() => {
+    const isText = (t: EventTarget | null): boolean =>
+      t instanceof HTMLElement &&
+      (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+    const onDown = () => {
+      if (!busyRef.current.pointer) {
+        busyRef.current.pointer = true;
+        reportBusy();
+      }
+    };
+    const onUp = () => {
+      if (busyRef.current.pointer) {
+        busyRef.current.pointer = false;
+        reportBusy();
+      }
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      const next = isText(e.target);
+      if (next !== busyRef.current.focus) {
+        busyRef.current.focus = next;
+        reportBusy();
+      }
+    };
+    const onFocusOut = () => {
+      // focusout fires before the follow-up focusin when focus moves between
+      // two inputs, so always drop first and let focusin re-assert.
+      if (busyRef.current.focus) {
+        busyRef.current.focus = false;
+        reportBusy();
+      }
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointerup", onUp, true);
+    window.addEventListener("pointercancel", onUp, true);
+    // Window blur (Alt-Tab etc.) also means the pointerup is gone.
+    window.addEventListener("blur", onUp);
+    window.addEventListener("focusout", onFocusOut, true);
+    window.addEventListener("focusin", onFocusIn, true);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointerup", onUp, true);
+      window.removeEventListener("pointercancel", onUp, true);
+      window.removeEventListener("blur", onUp);
+      window.removeEventListener("focusout", onFocusOut, true);
+      window.removeEventListener("focusin", onFocusIn, true);
+    };
+  }, [reportBusy]);
 
   // Report island & panel rects to main process for cursor-based hover detection.
+  const confirm = useConfirmState();
   const reportHotZones = () => {
     const bridge = window.light;
     if (!bridge) return;
     const zones: HotZone[] = [];
+    // The modal mask spans the whole window — while it's up, every pixel of
+    // the (mostly transparent) window must be interactive so the mask can
+    // catch clicks instead of letting them fall through to other apps.
+    if (confirm.request) {
+      zones.push({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight });
+    }
     const padding = 6;
     const island = islandRef.current?.getBoundingClientRect();
     if (island && island.width > 0) {
@@ -150,7 +221,8 @@ export function Island({ sessions, memos, system }: Props) {
   // The island hugs its content (width:auto via .island-row) and framer's
   // `layout` animates size changes — so there's never empty space on the right.
   return (
-    <div className="stage" ref={stageRef}>
+    <ConfirmContext.Provider value={confirm.raise}>
+      <div className="stage" ref={stageRef}>
       <motion.div
         ref={islandRef}
         className={`island s-${status} ${isMinimal ? "minimal" : ""} ${open ? "open" : ""}`}
@@ -215,6 +287,8 @@ export function Island({ sessions, memos, system }: Props) {
           </div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+      <ConfirmDialog request={confirm.request} onSettle={confirm.settle} />
+    </ConfirmContext.Provider>
   );
 }

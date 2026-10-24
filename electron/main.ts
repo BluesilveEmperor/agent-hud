@@ -28,6 +28,16 @@ let cursorTimer: NodeJS.Timeout | null = null;
 let currentlyIgnoring = true;
 let hotZones: HotZone[] = [];
 let lastHoverSent: boolean | null = null;
+// Input lease, reported by the renderer (same idea as dsh-pet's inputBusy):
+//   pointer — a mouse button is held down. While held, the cursor-poll's
+//     position-based decision must be vetoed: sliding off a hot zone mid-press
+//     would flip the window click-through and swallow the pending pointerup,
+//     breaking scrollbar drags, text selection and button presses.
+//   focus — a text input inside the panel has keyboard focus (memo draft,
+//     webhook URL). Click-through still applies as usual, but the poll must
+//     NOT call releaseFocusSoon: the delayed blur collapses the panel and the
+//     draft is lost even though the user never clicked another app.
+let inputBusy = { pointer: false, focus: false };
 // Delayed focus release: when the HUD goes click-through we must also give up
 // OS focus, otherwise Windows keeps the whole (mostly invisible) window rect
 // hit-testable and it silently swallows every click beneath it.
@@ -114,22 +124,41 @@ function createWindow(): void {
   }
 
   mainWindow.once("ready-to-show", () => {
-    mainWindow?.showInactive();
-    startCursorPoll();
-    // Apply the persisted theme before the capsule becomes visible, so there's
-    // no dark→light flash on a light-mode user's screen.
-    pushThemeToRenderer();
+    showIfNeeded();
+  });
+
+  // [fallback show] ready-to-show can silently never fire (a hung/failed page
+  // load, or paintWhenInitiallyHidden interplay), leaving an invisible window
+  // and a "running" process. Once the page finished loading, force one
+  // deferred show if the window is still hidden — same defense as dsh-pet's
+  // helper runtime. Idempotent: startCursorPoll/pushThemeToRenderer both are.
+  mainWindow.webContents.once("did-finish-load", () => {
+    setTimeout(() => showIfNeeded(), 400);
   });
 
   // Click outside the island/panel (focus moves to another app) → collapse panel.
   mainWindow.on("blur", () => {
     mainWindow?.webContents.send("light:blur");
+    // A lost focus usually means a lost pointerup (e.g. Alt-Tab mid-drag):
+    // drop the pointer lease so the cursor poll can resume its normal
+    // position-based decisions instead of keeping the window interactive.
+    inputBusy.pointer = false;
   });
 
   mainWindow.on("closed", () => {
     mainWindow = null;
     stopCursorPoll();
   });
+}
+
+// Show the capsule exactly once (idempotent): called from ready-to-show and
+// from the did-finish-load fallback above. Applies the persisted theme before
+// becoming visible, so there's no dark→light flash on a light-mode user.
+function showIfNeeded(): void {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isVisible()) return;
+  mainWindow.showInactive();
+  startCursorPoll();
+  pushThemeToRenderer();
 }
 
 // Windows quirk: once this window holds focus (e.g. the user clicked the pill
@@ -171,7 +200,9 @@ function setIgnore(ignore: boolean): void {
   // so clicks pass through cleanly to whatever is underneath.
   if (ignore) {
     mainWindow.setIgnoreMouseEvents(true);
-    releaseFocusSoon();
+    // A focused text input must keep OS focus even when going click-through —
+    // only steal focus back if the renderer isn't holding a focus lease.
+    if (!inputBusy.focus) releaseFocusSoon();
   } else {
     cancelPendingBlur();
     mainWindow.setIgnoreMouseEvents(false);
@@ -190,13 +221,20 @@ function startCursorPoll(): void {
     const overHotZone = hotZones.some(
       (z) => localX >= z.x && localX < z.x + z.w && localY >= z.y && localY < z.y + z.h,
     );
-    setIgnore(!overHotZone);
+    // Pointer lease vetoes the position decision entirely (any positional
+    // threshold re-introduces "cursor outruns the window" races mid-drag —
+    // the exact bug class dsh-pet fixed in 0.2.10). Focus lease does not:
+    // click-through still applies, only the focus steal below is suppressed.
+    const leaseHeld = inputBusy.pointer;
+    setIgnore(leaseHeld ? false : !overHotZone);
 
     // Safety net: a focused HUD window is a click-eating window on Windows,
     // regardless of the ignore state (setIgnoreMouseEvents alone won't undo
     // it). Any time the cursor is outside the hot zones and we somehow still
-    // hold focus, give it back.
-    if (!overHotZone) releaseFocusSoon();
+    // hold focus, give it back — unless a lease says otherwise (a held mouse
+    // button needs the window; a focused input must not lose its draft to a
+    // delayed blur while the cursor is just passing through elsewhere).
+    if (!overHotZone && !leaseHeld && !inputBusy.focus) releaseFocusSoon();
 
     // Authoritative hover signal. DOM mouseenter/leave are unreliable while the
     // window is click-through (the OS stops delivering events once the cursor
@@ -386,6 +424,11 @@ function wireIpc(): void {
         z && typeof z.x === "number" && typeof z.y === "number" &&
         typeof z.w === "number" && typeof z.h === "number",
     );
+  });
+  ipcMain.on("light:set-input-busy", (_evt, busy: unknown) => {
+    if (!busy || typeof busy !== "object") return;
+    const b = busy as { pointer?: unknown; focus?: unknown };
+    inputBusy = { pointer: b.pointer === true, focus: b.focus === true };
   });
   ipcMain.on("light:add-memo", (_evt, text: string) => {
     if (typeof text !== "string") return;

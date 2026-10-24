@@ -11,7 +11,7 @@
 ; ============================================================================
 
 #define MyAppName "AgentHUD"
-#define MyAppVersion "4.0.0"
+#define MyAppVersion "4.1.0"
 #define MyAppPublisher "AgentHUD"
 #define MyAppExeName "AgentHUD.exe"
 

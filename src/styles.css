@@ -1596,6 +1596,96 @@ body,
 }
 
 /* ======================================================================
+   CONFIRM DIALOG — modal mask + centered card (dsh-pet settings pattern).
+   The overlay is reported as a full-window hot zone while up, so every
+   click inside the window lands on the mask (mask click = cancel) instead
+   of falling through to the app underneath. zIndex is the Int32 ceiling —
+   the window is otherwise click-through, nothing of ours sits above.
+   ====================================================================== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+.confirm-card {
+  width: 320px;
+  max-width: calc(100% - 40px);
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 40%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    rgba(22, 24, 31, 0.92);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3),
+    0 18px 44px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.22);
+  text-shadow: 0 0.5px 1.5px rgba(0, 0, 0, 0.38);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.confirm-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.confirm-body {
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.confirm-btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-shadow: inherit;
+}
+.confirm-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.confirm-btn:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+.confirm-btn.primary {
+  background: rgba(127, 200, 220, 0.28);
+  border-color: rgba(127, 200, 220, 0.45);
+}
+.confirm-btn.primary:hover {
+  background: rgba(127, 200, 220, 0.4);
+}
+.confirm-btn.danger {
+  background: rgba(245, 168, 159, 0.22);
+  border-color: rgba(245, 168, 159, 0.45);
+}
+.confirm-btn.danger:hover {
+  background: rgba(245, 168, 159, 0.34);
+}
+
+/* ======================================================================
    LIGHT MODE
    The dark theme is the default (above). Light mode is an opt-in override:
    we flip the CSS variables and re-skin the glass surfaces so the capsule
@@ -1929,4 +2019,44 @@ html.light .theme-btn.active {
 }
 html.light .theme-btn:not(.active) {
   box-shadow: inset 0 0 8px rgba(91, 174, 201, 0.05);
+}
+
+/* ---- confirm dialog on light theme: flip the glass to white ---- */
+html.light .confirm-card {
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.2) 40%,
+      rgba(255, 255, 255, 0) 100%
+    ),
+    rgba(250, 251, 253, 0.94);
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 0 0 0.5px rgba(15, 23, 42, 0.14),
+    0 18px 44px rgba(15, 23, 42, 0.22),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.9);
+  text-shadow: none;
+}
+html.light .confirm-btn {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.05);
+}
+html.light .confirm-btn:hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+html.light .confirm-btn:active {
+  background: rgba(15, 23, 42, 0.15);
+}
+html.light .confirm-btn.primary {
+  background: rgba(91, 174, 201, 0.2);
+  border-color: rgba(91, 174, 201, 0.5);
+}
+html.light .confirm-btn.primary:hover {
+  background: rgba(91, 174, 201, 0.32);
+}
+html.light .confirm-btn.danger {
+  background: rgba(209, 112, 102, 0.16);
+  border-color: rgba(209, 112, 102, 0.5);
+}
+html.light .confirm-btn.danger:hover {
+  background: rgba(209, 112, 102, 0.28);
 }

@@ -68,5 +68,10 @@ contextBridge.exposeInMainWorld("light", {
   },
   mediaControl: (action: string) => ipcRenderer.send("light:media-control", action),
   setHotZones: (zones: HotZone[]) => ipcRenderer.send("light:set-hot-zones", zones),
+  // Input lease: renderer reports whether a mouse button is held or a text
+  // input has focus. The main process lets the pointer lease veto the
+  // click-through decision and the focus lease veto delayed blur.
+  setInputBusy: (busy: { pointer: boolean; focus: boolean }) =>
+    ipcRenderer.send("light:set-input-busy", busy),
   quit: () => ipcRenderer.send("light:quit"),
 });

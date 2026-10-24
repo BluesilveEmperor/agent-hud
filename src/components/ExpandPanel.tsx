@@ -16,6 +16,7 @@ import type {
   ThemeState,
 } from "../types";
 import { MediaFull } from "./MediaCard";
+import { useConfirm } from "./ConfirmDialog";
 import {
   contextColor,
   contextLabel,
@@ -88,6 +89,7 @@ function statusLine(a: SessionState): string {
 
 export function ExpandPanel({ sessions, memos, system }: Props) {
   const [draft, setDraft] = useState("");
+  const confirm = useConfirm();
 
   const allEvents = sessions
     .flatMap((s) => s.recent.map((e) => ({ ...e, _key: s.key, _agent: s.agent })))
@@ -102,6 +104,29 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
     if (!t) return;
     window.light?.addMemo(t);
     setDraft("");
+  };
+
+  // Destructive actions confirm first — a single click on a tiny row button
+  // used to remove the session / wipe the stream / tear out hooks with no
+  // undo (same pattern as dsh-pet's settings dialogs).
+  const removeSession = async (agent: string, seq: number, key: string) => {
+    const ok = await confirm({
+      title: "移除这个对话？",
+      body: `${agent} 的对话 ${seq} 会从列表移除；已归档的历史记录保留。`,
+      confirmLabel: "移除",
+      danger: true,
+    });
+    if (ok) window.light?.removeSession(key);
+  };
+
+  const clearEvents = async () => {
+    const ok = await confirm({
+      title: "清空事件流？",
+      body: "当前展示的事件列表会被清空，正在运行的会话不受影响。",
+      confirmLabel: "清空",
+      danger: true,
+    });
+    if (ok) window.light?.clearEvents();
   };
 
   return (
@@ -134,7 +159,7 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
                   </span>
                   <button
                     className="row-x"
-                    onClick={() => window.light?.removeSession(a.key)}
+                    onClick={() => removeSession(AGENT_LABEL[a.agent], a.seq, a.key)}
                     title="从列表移除这个对话"
                     aria-label="移除"
                   >
@@ -211,7 +236,7 @@ export function ExpandPanel({ sessions, memos, system }: Props) {
           <span>事件流</span>
           <button
             className="link-btn"
-            onClick={() => window.light?.clearEvents()}
+            onClick={() => void clearEvents()}
             disabled={allEvents.length === 0}
           >
             清空
@@ -259,6 +284,7 @@ function HooksSection() {
     null,
   );
   const [note, setNote] = useState<string>("");
+  const confirm = useConfirm();
 
   const refresh = () => {
     window.light?.getHooksStatus().then(setStatus).catch(() => {});
@@ -282,6 +308,14 @@ function HooksSection() {
 
   const uninstall = async (agent: HookAgentKey) => {
     if (!window.light?.uninstallHooks || busy) return;
+    const label = HOOK_AGENTS.find((h) => h.key === agent)?.label ?? agent;
+    const ok = await confirm({
+      title: `取消接入 ${label}？`,
+      body: "会从该 Agent 的配置里移除 Light 写入的 hooks，不影响文件中的其他配置。",
+      confirmLabel: "取消接入",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy({ agent, op: "uninstall" });
     setNote("");
     try {
