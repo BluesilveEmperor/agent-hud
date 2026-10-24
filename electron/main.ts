@@ -46,18 +46,24 @@ function getDevServerUrl(): string | undefined {
 }
 
 // The branded icon, resolved for both layouts:
-//   packaged → resources/app/icon.ico   (staged by scripts/stage.mjs)
-//   dev      → <root>/installer/light.ico
+//   packaged → resources/app/icon.<ext>   (staged by scripts/stage.mjs)
+//   dev      → <root>/installer/light.<ext>
+// Windows takes the multi-size .ico; macOS/Linux take the PNG (nativeImage
+// cannot reliably decode .ico off Windows, and the Dock/tray need a bitmap).
 function resolveIcon(): string | undefined {
-  const candidates = [
-    path.join(__dirname, "..", "icon.ico"),
-    path.join(__dirname, "..", "installer", "light.ico"),
-  ];
-  for (const c of candidates) {
-    try {
-      if (fs.existsSync(c)) return c;
-    } catch {
-      /* ignore */
+  const order = process.platform === "win32" ? ["ico", "png"] : ["png", "ico"];
+  const dirs = [path.join(__dirname, ".."), path.join(__dirname, "..", "installer")];
+  const names = ["icon", "light"];
+  for (const ext of order) {
+    for (const dir of dirs) {
+      for (const name of names) {
+        const candidate = path.join(dir, `${name}.${ext}`);
+        try {
+          if (fs.existsSync(candidate)) return candidate;
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }
   return undefined;

@@ -13,6 +13,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -73,10 +74,50 @@ const electronBin = platform === "darwin"
   : path.join(electronDist, electronBinaryName());
 
 // ---- resolve icon ---------------------------------------------------------
-// .ico on Windows, .png/.icns on Mac, .png on Linux. We ship .ico; on Mac/Linux
-// we fall back to it (Electron accepts .ico cross-platform for the tray; the
-// window icon is less critical on Mac where the dock uses the .app icon).
+// Windows ships the multi-size .ico; macOS/Linux need a bitmap (nativeImage
+// cannot reliably decode .ico off Windows, and macOS wants an .icns bundle
+// icon). We ship both and pick per platform at runtime.
 const iconSrc = path.join(root, "installer", "light.ico");
+const iconPng = path.join(root, "installer", "light.png");
+
+// Build Contents/Resources/icon.icns from the 1024² PNG using macOS's own
+// sips + iconutil (no extra dependencies). Silent no-op elsewhere.
+function makeIcns(pngSrc, resourcesDir) {
+  if (platform !== "darwin" || !fs.existsSync(pngSrc)) return false;
+  const iconset = path.join(resourcesDir, "icon.iconset");
+  const specs = [
+    [16, "icon_16x16.png"],
+    [32, "icon_16x16@2x.png"],
+    [32, "icon_32x32.png"],
+    [64, "icon_32x32@2x.png"],
+    [128, "icon_128x128.png"],
+    [256, "icon_128x128@2x.png"],
+    [256, "icon_256x256.png"],
+    [512, "icon_256x256@2x.png"],
+    [512, "icon_512x512.png"],
+    [1024, "icon_512x512@2x.png"],
+  ];
+  try {
+    rmrf(iconset);
+    fs.mkdirSync(iconset, { recursive: true });
+    for (const [size, name] of specs) {
+      execFileSync("sips", ["-z", String(size), String(size), pngSrc, "--out", path.join(iconset, name)], {
+        stdio: "ignore",
+      });
+    }
+    execFileSync("iconutil", ["-c", "icns", iconset, "-o", path.join(resourcesDir, "icon.icns")], {
+      stdio: "ignore",
+    });
+    rmrf(iconset);
+    return true;
+  } catch (e) {
+    log(`WARN: .icns 生成失败（${e.message}），回退为 PNG 图标`);
+    try {
+      rmrf(iconset);
+    } catch {}
+    return false;
+  }
+}
 
 // ---- preconditions --------------------------------------------------------
 const distRenderer = path.join(root, "dist");
@@ -118,13 +159,35 @@ if (platform === "darwin") {
   // Drop the bundled demo app.
   rmrf(path.join(bundleContents, "Resources", "default_app.asar"));
   // Fix Info.plist so the dock/menubar shows "AgentHUD".
+  // Also point CFBundleIconFile at the .icns we generate from light.png —
+  // without it macOS falls back to the generic Electron icon.
+  const resourcesDir = path.join(bundleContents, "Resources");
+  const icnsOk = makeIcns(iconPng, resourcesDir);
   const plistPath = path.join(bundleContents, "Info.plist");
   if (fs.existsSync(plistPath)) {
     let plist = fs.readFileSync(plistPath, "utf8");
+    // CFBundleExecutable MUST match the renamed binary in Contents/MacOS,
+    // otherwise macOS refuses to launch the bundle ("app is damaged").
+    plist = plist.replace(/<key>CFBundleExecutable<\/key>\s*<string>[^<]*<\/string>/,
+      `<key>CFBundleExecutable</key><string>${EXEC_NAME}</string>`);
     plist = plist.replace(/<key>CFBundleName<\/key>\s*<string>[^<]*<\/string>/,
       `<key>CFBundleName</key><string>${APP_NAME}</string>`);
     plist = plist.replace(/<key>CFBundleDisplayName<\/key>\s*<string>[^<]*<\/string>/,
       `<key>CFBundleDisplayName</key><string>${APP_NAME}</string>`);
+    // Don't ship Electron's bundle id — it breaks LaunchServices registration
+    // when two Electron-based apps are installed.
+    plist = plist.replace(/<key>CFBundleIdentifier<\/key>\s*<string>[^<]*<\/string>/,
+      `<key>CFBundleIdentifier</key><string>com.agenthud.app</string>`);
+    if (icnsOk) {
+      if (/<key>CFBundleIconFile<\/key>/.test(plist)) {
+        plist = plist.replace(
+          /<key>CFBundleIconFile<\/key>\s*<string>[^<]*<\/string>/,
+          `<key>CFBundleIconFile</key><string>icon.icns</string>`,
+        );
+      } else {
+        plist = plist.replace("<dict>", `<dict>\n\t<key>CFBundleIconFile</key>\n\t<string>icon.icns</string>`);
+      }
+    }
     fs.writeFileSync(plistPath, plist, "utf8");
   }
   // Update appDir: on macOS the payload goes into Contents/Resources/app/
@@ -201,6 +264,9 @@ if (fs.existsSync(path.join(root, "bridge"))) {
 if (fs.existsSync(iconSrc)) {
   fs.copyFileSync(iconSrc, path.join(appDir, "icon.ico"));
 }
+if (fs.existsSync(iconPng)) {
+  fs.copyFileSync(iconPng, path.join(appDir, "icon.png"));
+}
 
 // Trimmed production package.json.
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
@@ -226,6 +292,13 @@ if (fs.existsSync(iconSrc)) {
     ? path.join(outDir, "Contents", "Resources", "light.ico")
     : path.join(outDir, "light.ico");
   fs.copyFileSync(iconSrc, iconOut);
+}
+// macOS/Linux resolve the window + tray icon from this PNG.
+if (fs.existsSync(iconPng)) {
+  const pngOut = platform === "darwin"
+    ? path.join(outDir, "Contents", "Resources", "light.png")
+    : path.join(outDir, "light.png");
+  fs.copyFileSync(iconPng, pngOut);
 }
 
 // ---- Linux: make executable + create .desktop entry -----------------------

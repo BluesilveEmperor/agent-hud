@@ -99,13 +99,21 @@ function resolveHooksDir(): string | null {
   // Candidate order matters: external paths first, ASAR-internal last.
   const candidates: string[] = [];
 
-  // 1. External hooks directory (packaged): <install>/hooks
-  //    __dirname = .../resources/app/dist-electron  →  go up 3 levels
+  // Layouts we ship:
+  //   Windows/Linux  <install>/hooks                    (stage.mjs flat layout)
+  //   macOS          AgentHUD.app/Contents/Resources/hooks
+  // In both cases __dirname is <...>/app/dist-electron, so:
+  //   ../../../hooks  → <install>/hooks      (Win/Linux) / Contents/hooks  (mac, wrong)
+  //   ../../hooks     → <install>/resources/hooks (Win, absent) / Contents/Resources/hooks (mac ✓)
+  //   resourcesPath/hooks → Contents/Resources/hooks on mac (authoritative)
   candidates.push(path.join(__dirname, "..", "..", "..", "hooks"));
+  candidates.push(path.join(__dirname, "..", "..", "hooks"));
 
-  // 2. Via process.resourcesPath (packaged): <install>/hooks
+  // 2. Via process.resourcesPath: <install>/hooks (Win/Linux) or
+  //    <install>/Contents/Resources/hooks (macOS).
   if (process.resourcesPath) {
     candidates.push(path.join(process.resourcesPath, "..", "hooks"));
+    candidates.push(path.join(process.resourcesPath, "hooks"));
   }
 
   // 3. Dev mode: <repo>/hooks  (only valid when running from source)

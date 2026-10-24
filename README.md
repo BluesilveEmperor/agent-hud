@@ -5,7 +5,7 @@
 
 基于 [chai1220/light](https://github.com/chai1220/light) 二次开发，新增多 agent 接入、token 监控、完成通知、会话历史、行为统计、主题切换、HarmonyOS 风格视效、WSL 调用监控等功能。
 
-当前版本 **0.4.3**。
+当前版本 **0.4.4**。
 
 ## 功能一览
 
@@ -115,14 +115,14 @@ npm run dev:web    # 在浏览器打开 http://localhost:5173
 ```bash
 npm run dist          # build + stage → release/AgentHUD/
 iscc installer/light.iss
-# → release/AgentHUD-Setup-0.4.3.exe
+# → release/AgentHUD-Setup-0.4.4.exe
 ```
 
 #### macOS
 
 ```bash
 npm run dist:mac      # build + stage + pack-dmg
-# → release/AgentHUD-0.4.3.dmg
+# → release/AgentHUD-0.4.4.dmg
 ```
 
 `pack-dmg.mjs` 使用系统自带的 `hdiutil`，无需额外依赖。
@@ -131,19 +131,34 @@ npm run dist:mac      # build + stage + pack-dmg
 
 ```bash
 npm run dist:linux    # build + stage + pack-tarball
-# → release/AgentHUD-0.4.3-linux-x64.tar.gz
+# → release/AgentHUD-0.4.4-linux-x64.tar.gz
 ```
 
 解压后运行：
 ```bash
-tar xzf AgentHUD-0.4.3-linux-x64.tar.gz
+tar xzf AgentHUD-0.4.4-linux-x64.tar.gz
 ./AgentHUD/run.sh
+# 想出现在应用菜单里（无需 root）：
+./AgentHUD/install-desktop.sh
 ```
 
 > Linux 上透明窗口的表现取决于桌面环境（GNOME/KDE/X11/Wayland）。Wayland 下透明可能不生效，建议在 X11 会话中运行。
+> 托盘图标依赖系统托盘支持（GNOME 需装 AppIndicator 扩展）；没有托盘时可用胶囊面板操作，功能不受影响。
+
+#### macOS 首次运行
+
+DMG 里的 `.app` 未做代码签名/公证，Gatekeeper 会拦。任选其一：
+
+```bash
+# 方式一：命令行去隔离属性（推荐）
+xattr -cr /Applications/AgentHUD.app
+open /Applications/AgentHUD.app
+# 方式二：Finder 里右键 → 打开 → 再点「打开」
+```
+
+> 未签名意味着首次启动会提示"无法验证开发者"，这是预期行为，不是文件损坏。
 
 #### 用 electron-builder 统一打包（可选）
-
 项目也配置了 electron-builder，可以在对应平台上生成标准安装包：
 
 ```bash
@@ -160,8 +175,8 @@ npx electron-builder --linux  # Linux: AppImage + deb
 仓库自带 `.github/workflows/build-release.yml`，打 `v*` tag 时自动在 Windows/macOS/Linux 三平台并行构建并发布 GitHub Release：
 
 ```bash
-git tag v0.4.3
-git push origin v0.4.3
+git tag v0.4.4
+git push origin v0.4.4
 # → Actions 页面查看构建进度，完成后 Release 页面下载安装包
 ```
 
@@ -173,6 +188,10 @@ CI 流程：
    - macOS：DMG 镜像
    - Linux：tarball 压缩包
 4. 自动创建 GitHub Release 并上传全部产物
+
+> **构建必须在目标平台上进行**：`npm run dist:mac` 需要 macOS 的 `hdiutil`/`sips`/`iconutil`，
+> `npm run dist:linux` 需要在 Linux 上跑（`tar`/`chmod`/可执行位）。Windows 只能产出 Windows 包。
+> 三平台并行构建交给 `.github/workflows/build-release.yml`（打 `v*` tag 触发）。
 
 ### 平台差异说明
 
@@ -187,6 +206,11 @@ CI 流程：
 | 媒体控制（播放/暂停等） | SMTC 支持 | 暂不支持 | 暂不支持 |
 | WSL 调用监控 | 完整支持 | 完整支持 | 完整支持 |
 | 一键接入 hooks | 完整支持 | 完整支持 | 完整支持 |
+| 应用图标 | `.ico` | `.icns`（构建时由 `light.png` 生成） | `.png` |
+| 安装包 | Inno Setup / NSIS | `.dmg`（拖入 Applications） | `.tar.gz` + 应用菜单注册脚本 |
+
+> 所有 agent 的配置目录都是跨平台同一套（`~/.claude`、`~/.codex`、`~/.config/opencode`、
+> `~/.codeartsdoer`、`~/.workbuddy`、`~/.hermes`），macOS 与 Linux 无需额外指定路径。
 
 ## 接入 Agent
 

@@ -11,6 +11,11 @@ AGENT HUD（基于 Light）通过本地 HTTP 服务（`127.0.0.1:51789`）接收
 > 全程保留已有配置、不覆盖、先写 `.light-backup` 备份，路径自动填好。下面的手动步骤
 > 只在你想自己改配置时才需要。
 >
+> **平台路径**：所有 agent 的配置目录在 Windows / macOS / Linux 上是同一套
+> （`~/.claude`、`~/.codex`、`~/.config/opencode`、`~/.codeartsdoer`、`~/.workbuddy`、`~/.hermes`），
+> 不需要为 mac/linux 单独指定。macOS 打包后 hooks 位于
+> `AgentHUD.app/Contents/Resources/hooks/`，Windows/Linux 位于安装目录下的 `hooks/`。
+>
 > **取消接入**：面板里对应 agent 右侧的「取消」按钮。它只摘除本应用写入的条目
 > （hooks 按脚本名精确匹配；plugin 改名为 `.light-backup`），其它配置保持原样。
 
@@ -56,7 +61,8 @@ node 也认，例如 `C:/Users/你的用户名/agent-hud`）：
 - 进新窗口先敲 `/hooks` 确认这四项已注册；如有"信任此 hook"提示，确认放行。
 - `claude-hook.mjs` 读取 Claude 通过 stdin 推来的 JSON（`session_id`、`tool_name`、`prompt`），提取后 POST 给 HUD，并在 `%TEMP%\light-hook.log` 留一行调用日志（排错用）。
 - HUD 没启动时脚本静默退出，不会阻塞 Claude 的 hook 流水线。
-- Mac / Linux 用 `claude-hook.sh`（`chmod +x`），命令写 `bash /path/claude-hook.sh user_prompt`。
+- Mac / Linux 可以直接用同一条 `node ".../claude-hook.mjs" user_prompt` 命令（node 跨平台），
+  也可以用 `./claude-hook.sh user_prompt`（仓库里已带可执行位；Windows 上用 `claude-hook.cmd`）。
 
 ## 2. Codex CLI（官方 hooks，推荐）
 

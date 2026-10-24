@@ -24,14 +24,33 @@ if (!fs.existsSync(appPath)) {
 
 console.log(`[pack-dmg] creating ${path.basename(dmgPath)} …`);
 
+// Stage a folder that contains the .app plus an /Applications shortcut, so
+// the mounted DMG supports the usual drag-to-install gesture.
+const stageDir = path.join(root, "release", ".dmg-stage");
+fs.rmSync(stageDir, { recursive: true, force: true });
+fs.mkdirSync(stageDir, { recursive: true });
+fs.cpSync(appPath, path.join(stageDir, "AgentHUD.app"), {
+  recursive: true,
+  dereference: false, // keep the Electron framework symlinks inside the bundle
+});
+try {
+  fs.symlinkSync("/Applications", path.join(stageDir, "Applications"), "dir");
+} catch {
+  /* non-fatal: DMG just won't have the shortcut */
+}
+
 // Remove old dmg
 if (fs.existsSync(dmgPath)) fs.rmSync(dmgPath);
 
-// hdiutil create -volname "AgentHUD" -srcfolder <app> -ov -format UDZO <dmg>
-execSync(
-  `hdiutil create -volname "AgentHUD" -srcfolder "${appPath}" -ov -format UDZO "${dmgPath}"`,
-  { stdio: "inherit" },
-);
+// hdiutil create -volname "AgentHUD" -srcfolder <stage> -ov -format UDZO <dmg>
+try {
+  execSync(
+    `hdiutil create -volname "AgentHUD" -srcfolder "${stageDir}" -ov -format UDZO "${dmgPath}"`,
+    { stdio: "inherit" },
+  );
+} finally {
+  fs.rmSync(stageDir, { recursive: true, force: true });
+}
 
 const sizeMB = (fs.statSync(dmgPath).size / 1024 / 1024).toFixed(1);
 console.log(`[pack-dmg] done → ${path.relative(root, dmgPath)} (${sizeMB} MB)`);

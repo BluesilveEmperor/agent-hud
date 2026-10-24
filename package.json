@@ -42,12 +42,12 @@
     },
     "mac": {
       "target": ["dmg"],
-      "icon": "installer/light.ico",
+      "icon": "installer/light.png",
       "category": "public.app-category.utilities"
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "icon": "installer/light.ico",
+      "icon": "installer/light.png",
       "category": "Utility"
     },
     "nsis": {

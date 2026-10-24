@@ -37,6 +37,31 @@ fs.writeFileSync(path.join(appDir, "run.sh"), launcher, "utf8");
 fs.chmodSync(path.join(appDir, "run.sh"), 0o755);
 fs.chmodSync(path.join(appDir, "agenthud"), 0o755);
 
+// Register in the desktop app menu (per-user, no root). Path is resolved at
+// install time because the tarball can be extracted anywhere.
+const desktopInstaller = `#!/bin/bash
+# Add AgentHUD to the application menu (per-user). No root needed.
+set -e
+DIR="$(cd "$(dirname "$0")" && pwd)"
+APPS="$HOME/.local/share/applications"
+mkdir -p "$APPS"
+cat > "$APPS/agenthud.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=AgentHUD
+Comment=Desktop status capsule for AI coding agents
+Exec=$DIR/run.sh
+Icon=$DIR/light.png
+Terminal=false
+Categories=Utility;
+StartupWMClass=AgentHUD
+EOF
+update-desktop-database "$APPS" 2>/dev/null || true
+echo "Installed: $APPS/agenthud.desktop"
+`;
+fs.writeFileSync(path.join(appDir, "install-desktop.sh"), desktopInstaller, "utf8");
+fs.chmodSync(path.join(appDir, "install-desktop.sh"), 0o755);
+
 execSync(`tar czf "${tarball}" -C "${path.join(root, "release")}" AgentHUD`, {
   stdio: "inherit",
 });
